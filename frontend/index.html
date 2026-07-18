@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SAE - 智能预测引擎</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        /* === 基础重置 === */
+        body {
+            font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #0b1a2f; /* 深邃夜蓝 */
+            color: #e6f1ff;
+            min-height: 100vh;
+        }
+
+        /* === 布局容器 === */
+        .header {
+            background-color: #112240;
+            height: 64px;
+            padding: 0 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #64ffda;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 2000;
+        }
+
+        .header-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #e6f1ff;
+            letter-spacing: 1px;
+        }
+
+        .header-subtitle {
+            font-size: 14px;
+            color: #64ffda;
+            margin-left: 15px;
+            padding-left: 15px;
+            border-left: 1px solid #8892b0;
+        }
+
+        .container {
+            width: 1300px;
+            margin: 30px auto;
+            background-color: #112240;
+            padding: 40px;
+            border-radius: 8px;
+            border: 1px solid #233554;
+            box-shadow: 0 10px 30px -10px rgba(2,12,27,0.7);
+            min-height: 800px;
+        }
+
+        /* === Element UI 样式深度定制 === */
+        
+        /* 1. 标签页 & 步骤条 */
+        .el-tabs__item { color: #8892b0 !important; font-size: 16px; }
+        .el-tabs__item.is-active { color: #64ffda !important; font-weight: bold; }
+        .el-tabs__nav-wrap::after { background-color: #233554; }
+        .el-step__title { color: #8892b0 !important; }
+        .el-step__title.is-process { color: #fff !important; font-weight: bold; }
+        .el-step__title.is-success { color: #64ffda !important; }
+        .el-step__head.is-success { color: #64ffda; border-color: #64ffda; }
+        
+        /* 2. 卡片 & 表单 */
+        .config-card, .el-card {
+            background-color: #172a45 !important;
+            border: 1px solid #233554 !important;
+            color: #e6f1ff !important;
+        }
+        .el-card__header { border-bottom: 1px solid #233554; font-weight: bold; color: #64ffda; }
+        .el-input__inner { background-color: #0b1a2f !important; border: 1px solid #8892b0 !important; color: #fff !important; }
+        .el-form-item__label { color: #e6f1ff !important; font-weight: bold; }
+
+        /* 3. 上传 */
+        .el-upload-dragger { background-color: #112240 !important; border: 2px dashed #64ffda !important; }
+        .el-upload-dragger:hover { background-color: rgba(100, 255, 218, 0.1) !important; }
+        .el-upload__text { color: #e6f1ff !important; }
+        .el-upload__text em { color: #64ffda !important; }
+
+        /* ============================================================
+           4. 表格核心修复 (The Fix)
+           ============================================================ */
+        
+        /* 基础透明 */
+        .el-table, .el-table__expanded-cell {
+            background-color: transparent !important;
+            color: #e6f1ff !important;
+        }
+        .el-table th, .el-table tr {
+            background-color: transparent !important;
+        }
+        .el-table th {
+            background-color: #1a304a !important; 
+            color: #64ffda !important;
+            border-bottom: 1px solid #233554 !important;
+        }
+        .el-table td {
+            border-bottom: 1px solid #233554 !important;
+        }
+
+        /* 斑马纹 */
+        .el-table--striped .el-table__body tr.el-table__row--striped td {
+            background-color: rgba(255, 255, 255, 0.02) !important;
+        }
+
+        /* [核心修复]：同时覆盖普通 Hover 和 固定列同步 Hover (hover-row) */
+        .el-table--enable-row-hover .el-table__body tr:hover > td,
+        .el-table__body tr.hover-row > td {
+            background-color: rgba(100, 255, 218, 0.15) !important; /* 青色高亮 */
+            color: #ffffff !important;
+        }
+
+        /* [核心修复]：固定列 (右侧操作栏) 背景色强制修复 */
+        .el-table__fixed-right {
+            background-color: #112240 !important; /* 必须与容器背景一致，否则是白色 */
+            border-left: 1px solid #233554 !important;
+            box-shadow: -5px 0 10px rgba(0,0,0,0.2) !important;
+        }
+        /* 固定列头部和内容的背景设为透明，让上面的底色透出来 */
+        .el-table__fixed-right-header,
+        .el-table__fixed-right .el-table__body {
+            background-color: transparent !important;
+        }
+        
+        /* 5. 标签 (Tag) 修复 - 彻底去除白色 */
+        .el-table .el-tag {
+            background-color: rgba(100, 255, 218, 0.1) !important;
+            border-color: rgba(100, 255, 218, 0.3) !important;
+            color: #64ffda !important;
+        }
+        
+        /* 去除表格底部白线 */
+        .el-table::before { height: 0px; }
+        .el-table__fixed-right::before { height: 0px; }
+
+        /* ============================================================ */
+
+        /* 6. 描述列表 & 弹窗 */
+        .el-descriptions__body { background-color: transparent !important; color: #e6f1ff !important; }
+        .el-descriptions-item__label { background-color: rgba(100, 255, 218, 0.1) !important; color: #64ffda !important; font-weight: bold; border-color: #233554 !important; }
+        .el-descriptions-item__content { background-color: transparent !important; color: #e6f1ff !important; border-color: #233554 !important; }
+
+        .el-dialog { background-color: #112240 !important; border: 1px solid #64ffda; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        .el-dialog__title { color: #e6f1ff !important; font-weight: bold; }
+        .el-dialog__body { color: #e6f1ff !important; }
+        .manual-table th { background-color: #1a304a !important; color: #64ffda !important; }
+
+        /* 7. 按钮 & 其他 */
+        .el-button--primary { background-color: rgba(100, 255, 218, 0.1) !important; border: 1px solid #64ffda !important; color: #64ffda !important; font-weight: bold; }
+        .el-button--primary:hover { background-color: rgba(100, 255, 218, 0.3) !important; }
+        .help-btn { color: #64ffda; font-size: 14px; font-weight: bold; }
+        .help-btn:hover { color: #fff; text-decoration: underline; }
+        .status-online { color: #64ffda; font-weight: bold; }
+        
+        .chart-card { background-color: #172a45; border: 1px solid #233554; padding: 15px; border-radius: 8px; }
+        .chart-box { width: 100%; height: 350px; }
+        .charts-grid { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; }
+        .chart-card { width: 48%; box-sizing: border-box; }
+        .required-col { color: #ff6b6b; font-family: monospace; background: rgba(255, 107, 107, 0.1); padding: 2px 6px; border-radius: 4px; }
+        
+        /* 下拉菜单 */
+        .el-select-dropdown { background-color: #112240 !important; border: 1px solid #233554 !important; }
+        .el-select-dropdown__item { color: #8892b0 !important; }
+        .el-select-dropdown__item.hover, .el-select-dropdown__item:hover { background-color: #172a45 !important; color: #fff !important; }
+        .el-select-dropdown__item.selected { color: #64ffda !important; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <div class="header-left">
+                <i class="el-icon-data-line" style="color: #64ffda; font-size: 24px; margin-right: 10px;"></i>
+                <span class="header-title">SPARK 智能预测平台</span>
+                <span class="header-subtitle">Distributed Async Engine</span>
+            </div>
+            <div>
+                <el-button type="text" icon="el-icon-document" class="help-btn" @click="showManual = true">使用说明手册</el-button>
+                <span style="margin: 0 15px; color: #8892b0;">|</span>
+                <span style="font-size: 14px; color: #8892b0;">状态: <span class="status-online">ONLINE</span></span>
+            </div>
+        </div>
+
+        <div class="container">
+            <el-tabs v-model="activeTab" type="card">
+                <el-tab-pane name="classify">
+                    <span slot="label"><i class="el-icon-cpu"></i> 智能预测任务</span>
+                    
+                    <el-steps :active="step" finish-status="success" simple style="margin-bottom: 40px; background: #172a45;">
+                        <el-step title="上传数据" icon="el-icon-upload"></el-step>
+                        <el-step title="配置参数" icon="el-icon-setting"></el-step>
+                        <el-step title="模型分析" icon="el-icon-cpu"></el-step>
+                        <el-step title="分析报告" icon="el-icon-data-analysis"></el-step>
+                    </el-steps>
+
+                    <div v-if="step === 0" style="padding: 40px 100px; text-align: center;">
+                        <el-upload
+                            class="upload-demo"
+                            drag
+                            action="http://localhost:5000/upload"
+                            :on-success="handleUploadSuccess"
+                            :on-error="handleUploadError"
+                            :on-progress="handleUploadProgress"
+                            :before-upload="beforeUpload"
+                            :show-file-list="false">
+                            <i class="el-icon-upload" style="color: #64ffda; font-size: 70px; margin-top: 20px;"></i>
+                            <div class="el-upload__text" style="color: #e6f1ff; margin-top: 10px;">
+                                拖拽 CSV 文件到此处，或 <em style="color: #64ffda;">点击上传</em>
+                            </div>
+                            <div class="el-upload__tip" slot="tip" style="color: #8892b0;">
+                                支持 GB 级数据，请参考右上角使用说明手册准备数据
+                            </div>
+                        </el-upload>
+                        
+                        <div v-if="uploadPercentage > 0" style="width: 500px; margin: 30px auto;">
+                            <div style="margin-bottom: 5px; color: #64ffda; font-size: 14px; text-align: left;">上传中... {{uploadPercentage}}%</div>
+                            <el-progress :percentage="uploadPercentage" :status="uploadPercentage === 100 ? 'success' : null" :stroke-width="15" :text-inside="true"></el-progress>
+                        </div>
+                    </div>
+
+                    <div v-if="step === 1" style="text-align: center;">
+                        <div class="config-card">
+                            <h3 style="color: #64ffda;"><i class="el-icon-circle-check"></i> 文件解析成功</h3>
+                            <p style="color: #8892b0; margin-bottom: 30px;">{{ currentFileName }}</p>
+                            
+                            <el-form label-position="top" size="medium" style="text-align: left;">
+                                <el-form-item label="1. 请选择业务应用场景">
+                                    <el-select v-model="selectedScene" placeholder="请选择场景" style="width: 100%;">
+                                        <el-option-group label="电商零售">
+                                            <el-option label="用户流失预警 (Churn)" value="shop_churn"></el-option>
+                                            <el-option label="交易欺诈检测 (Fraud)" value="shop_fraud"></el-option>
+                                            <el-option label="用户购买意向 (Order)" value="shop_order"></el-option>
+                                        </el-option-group>
+                                        <el-option-group label="交通物流">
+                                            <el-option label="乘客满意度 (Satisfaction)" value="trans_satisfaction"></el-option>
+                                            <el-option label="航班延误预测 (Delay)" value="trans_delay"></el-option>
+                                            <el-option label="交通事故定责 (Accident)" value="trans_accident"></el-option>
+                                        </el-option-group>
+                                        <el-option-group label="工业制造">
+                                            <el-option label="设备故障诊断 (Failure)" value="ind_failure"></el-option>
+                                            <el-option label="产品质量控制 (Quality)" value="ind_quality"></el-option>
+                                        </el-option-group>
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item label="2. 请选择算法模型">
+                                    <el-select v-model="modelType" placeholder="选择算法模型" style="width: 100%;">
+                                        <el-option label="✨ 智能推荐 (Auto - 自动择优)" value="auto"></el-option>
+                                        <el-option label="随机森林 (Random Forest)" value="random_forest"></el-option>
+                                        <el-option label="梯度提升树 (GBDT)" value="gbdt"></el-option>
+                                        <el-option label="朴素贝叶斯 (Naive Bayes)" value="naive_bayes"></el-option>
+                                    </el-select>
+                                </el-form-item>
+                                <div style="text-align: center; margin-top: 40px;">
+                                    <el-button @click="reset" style="margin-right: 15px;">重新上传</el-button>
+                                    <el-button type="primary" :loading="loading" @click="startPredict" icon="el-icon-cpu">
+                                        {{ loading ? loadingText : '开始智能分析' }}
+                                    </el-button>
+                                </div>
+                            </el-form>
+                        </div>
+                    </div>
+
+                    <div v-if="step === 2" style="text-align: center; padding: 60px 0;">
+                        <i class="el-icon-cpu" style="font-size: 80px; color: #64ffda; margin-bottom: 20px;"></i>
+                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">正在进行分布式计算...</div>
+                        <div style="color: #8892b0; margin-bottom: 40px;">任务 ID: {{ currentTaskId }} | Spark Engine Running</div>
+                        
+                        <div style="width: 600px; margin: 0 auto; background: #172a45; padding: 30px; border-radius: 8px; border: 1px solid #64ffda;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                                <span>当前模型: <b style="color: #64ffda;">{{ getAlgoName(currentModelName) }}</b></span>
+                                <span style="color: #fff;">{{ currentModelProgressStatus }}</span>
+                            </div>
+                            <el-progress :percentage="analysisProgress" :text-inside="true" :stroke-width="20" status="success"></el-progress>
+                        </div>
+                    </div>
+
+                    <div v-if="step === 3" style="margin-top: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0; color: #e6f1ff; border-left: 4px solid #64ffda; padding-left: 10px;">分析报告</h3>
+                            <el-button type="primary" plain size="small" icon="el-icon-refresh" @click="reset">新任务</el-button>
+                        </div>
+
+                        <el-card shadow="never" style="margin-bottom: 20px;">
+                            <el-descriptions title="" :column="4" border>
+                                <el-descriptions-item label="文件名">{{ currentFileName }}</el-descriptions-item>
+                                <el-descriptions-item label="场景">{{ getSceneName(selectedScene) }}</el-descriptions-item>
+                                <el-descriptions-item label="最终模型">{{ getAlgoName(predictResult.final_model) }}</el-descriptions-item>
+                                <el-descriptions-item label="完成时间">{{ currentFinishTime || '-' }}</el-descriptions-item>
+                            </el-descriptions>
+                        </el-card>
+
+                        <el-row :gutter="20" style="margin-bottom: 30px;">
+                            <el-col :span="8">
+                                <el-card shadow="hover" style="text-align: center;">
+                                    <div style="font-size: 36px; color: #64ffda; font-weight: bold;">
+                                        {{ (predictResult.accuracy * 100).toFixed(2) }}%
+                                    </div>
+                                    <div style="color: #8892b0; margin-top: 5px;">准确率 (Accuracy)</div>
+                                </el-card>
+                            </el-col>
+                            <el-col :span="8">
+                                <el-card shadow="hover" style="text-align: center;">
+                                    <div style="font-size: 20px; color: #fff; line-height: 46px; font-weight: bold;">
+                                        {{ getAlgoName(predictResult.final_model) }}
+                                    </div>
+                                    <div style="color: #8892b0; margin-top: 5px;">最佳模型</div>
+                                </el-card>
+                            </el-col>
+                            <el-col :span="8">
+                                <el-card shadow="hover" style="text-align: center;">
+                                    <div style="font-size: 20px; color: #64ffda; line-height: 46px; font-weight: bold;">Spark Engine</div>
+                                    <div style="color: #8892b0; margin-top: 5px;">计算核心</div>
+                                </el-card>
+                            </el-col>
+                        </el-row>
+
+                        <div class="charts-grid">
+                            <div class="chart-card"><div id="pieChart" class="chart-box"></div></div>
+                            <div class="chart-card" v-show="predictResult.confusion_matrix && predictResult.confusion_matrix.length > 0"><div id="heatmapChart" class="chart-box"></div></div>
+                            <div class="chart-card" v-show="predictResult.confusion_matrix && predictResult.confusion_matrix.length > 0"><div id="barChart" class="chart-box"></div></div>
+                            <div class="chart-card" v-show="predictResult.feature_importance && predictResult.feature_importance.length > 0"><div id="featureChart" class="chart-box"></div></div>
+                        </div>
+
+                        <div style="margin-top: 30px; background: #172a45; padding: 20px; border-radius: 8px; border: 1px solid #233554;">
+                            <div style="margin-bottom: 15px; font-size: 16px; font-weight: bold; color: #e6f1ff;">预测详情 (Top 100)</div>
+                            <el-table :data="predictResult.chart_data" style="width: 100%" height="400" border>
+                                <el-table-column prop="id" label="ID" width="80" align="center"></el-table-column>
+                                <el-table-column label="真实值" align="center">
+                                    <template slot-scope="scope">
+                                        <span style="font-weight: bold;">{{ scope.row.actual }}</span>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="预测值" align="center">
+                                    <template slot-scope="scope">
+                                        <span :style="{ 
+                                            color: scope.row.actual === '-' ? '#8892b0' : (scope.row.actual === scope.row.predicted ? '#64ffda' : '#ff6b6b'),
+                                            fontWeight: 'bold' 
+                                        }">
+                                            {{ scope.row.predicted }}
+                                        </span>
+                                    </template>
+                                </el-table-column>
+                            </el-table>
+                        </div>
+                    </div>
+                </el-tab-pane>
+
+                <el-tab-pane name="history">
+                    <span slot="label"><i class="el-icon-time"></i> 历史记录</span>
+                    <div style="padding: 20px;">
+                        <div style="text-align: right; margin-bottom: 20px;">
+                            <el-button type="primary" icon="el-icon-refresh" @click="fetchHistory">刷新列表</el-button>
+                        </div>
+                        
+                        <el-table 
+                            :data="historyData" 
+                            stripe 
+                            border 
+                            style="width: 100%"
+                            :default-sort="{prop: 'task_id', order: 'descending'}">
+                            
+                            <el-table-column prop="task_id" label="ID" width="80" align="center" sortable></el-table-column>
+                            
+                            <el-table-column prop="scene_type" label="任务类型" width="200" :filters="sceneFilters" :filter-method="filterHandler">
+                                <template slot-scope="scope">{{ getSceneName(scope.row.scene_type) }}</template>
+                            </el-table-column>
+                            
+                            <el-table-column label="文件名" min-width="200">
+                                <template slot-scope="scope"><i class="el-icon-document" style="color: #64ffda;"></i> {{ getFileName(scope.row.file_path) }}</template>
+                            </el-table-column>
+                            
+                            <el-table-column label="模型" width="150">
+                                <template slot-scope="scope">
+                                    <el-tag size="small" style="background-color: rgba(100,255,218,0.1); border-color: rgba(100,255,218,0.3); color: #64ffda;">{{ getAlgoName(scope.row.model_type) }}</el-tag>
+                                </template>
+                            </el-table-column>
+                            
+                            <el-table-column prop="status" label="状态" width="120" align="center" :filters="[{ text: '完成', value: 'completed' }, { text: '进行中', value: 'processing' }, { text: '失败', value: 'failed' }]" :filter-method="filterHandler">
+                                <template slot-scope="scope">
+                                    <el-tag v-if="scope.row.status === 'completed'" type="success" effect="dark" size="small" style="background-color: #64ffda; color: #0b1a2f; border:none; font-weight:bold;">完成</el-tag>
+                                    <el-tag v-else-if="scope.row.status === 'processing'" type="warning" effect="dark" size="small">进行中</el-tag>
+                                    <el-tag v-else type="danger" effect="dark" size="small">失败</el-tag>
+                                </template>
+                            </el-table-column>
+                            
+                            <el-table-column label="准确率" width="100" align="center">
+                                <template slot-scope="scope">
+                                    <span v-if="scope.row.status==='completed'" style="color: #64ffda; font-weight: bold;">{{ (scope.row.accuracy * 100).toFixed(2) }}%</span>
+                                    <span v-else>-</span>
+                                </template>
+                            </el-table-column>
+                            
+                            <el-table-column prop="finish_time" label="完成时间" width="180" align="center" sortable>
+                                <template slot-scope="scope">{{ scope.row.finish_time || '-' }}</template>
+                            </el-table-column>
+                            
+                            <el-table-column label="操作" width="120" align="center" fixed="right">
+                                <template slot-scope="scope">
+                                    <el-button 
+                                        v-if="scope.row.status === 'completed'"
+                                        type="text" 
+                                        icon="el-icon-view" 
+                                        @click="viewDetail(scope.row)"
+                                        style="color: #64ffda; font-weight: bold;">
+                                        查看
+                                    </el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </el-tab-pane>
+            </el-tabs>
+
+            <el-dialog 
+                title="📖 数据集格式使用说明" 
+                :visible.sync="showManual" 
+                width="80%" 
+                top="5vh"
+                :append-to-body="true">
+                <div style="margin-bottom: 15px; color: #8892b0;">
+                    请确保上传的 CSV 文件包含以下<b>关键特征列</b>。
+                </div>
+                <el-table :data="manualData" border stripe height="600" class="manual-table">
+                    <el-table-column prop="category" label="领域" width="120" align="center"></el-table-column>
+                    <el-table-column prop="scene_name" label="业务场景" width="180" align="center">
+                        <template slot-scope="scope">
+                            <span style="font-weight: bold; color: #64ffda;">{{ scope.row.scene_name }}</span>
+                            <br><span style="font-size: 12px; color: #8892b0;">({{ scope.row.code }})</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="target" label="Target" width="180">
+                        <template slot-scope="scope"><span class="required-col">{{ scope.row.target }}</span></template>
+                    </el-table-column>
+                    <el-table-column prop="features" label="Features">
+                        <template slot-scope="scope"><div style="font-size: 12px; color: #ccc;">{{ scope.row.features }}</div></template>
+                    </el-table-column>
+                </el-table>
+                <span slot="footer" class="dialog-footer">
+                    <el-button type="primary" @click="showManual = false">我已知晓</el-button>
+                </span>
+            </el-dialog>
+            
+            <el-dialog 
+                title="❌ 数据校验失败" 
+                :visible.sync="validationErrorDialog.visible" 
+                width="40%" 
+                :close-on-click-modal="false" 
+                :close-on-press-escape="false" 
+                :show-close="false"
+                :append-to-body="true"
+                center>
+                <div style="text-align: center; font-size: 16px;">
+                    <i class="el-icon-error" style="font-size: 50px; color: #F56C6C; margin-bottom: 20px;"></i>
+                    <p style="font-weight: bold; color: #fff;">上传数据缺少必要的特征列！</p>
+                    <p style="color: #8892b0; margin: 15px 0;">{{ validationErrorDialog.message }}</p>
+                    <div style="background: rgba(230, 162, 60, 0.2); padding: 10px; border-radius: 4px; color: #e6a23c; font-size: 14px; border: 1px solid #e6a23c;">
+                        <i class="el-icon-warning"></i> 请点击下方“查看说明手册”对照数据格式。
+                    </div>
+                </div>
+                <span slot="footer" class="dialog-footer">
+                    <el-button @click="showManual = true">查看手册</el-button>
+                    <el-button type="primary" @click="handleValidationErrorConfirm">确认并返回</el-button>
+                </span>
+            </el-dialog>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+        <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+        <script>
+            new Vue({
+                el: '#app',
+                data: {
+                    activeTab: 'classify',
+                    step: 0,
+                    loading: false,
+                    loadingText: 'Engines Starting...',
+                    pollingTimer: null,
+                    currentFilePath: '',
+                    currentFileName: '',
+                    currentFinishTime: '',
+                    selectedScene: 'ind_quality',
+                    modelType: 'auto',
+                    predictResult: { accuracy: 0, chart_data: [], distribution: [], final_model: '' },
+                    historyData: [],
+                    currentTaskId: null,
+                    currentModelName: 'None',
+                    currentModelProgressStatus: '等待开始',
+                    analysisProgress: 0,
+                    uploadPercentage: 0, 
+                    showManual: false,
+                    validationErrorDialog: { visible: false, message: '' },
+                    sceneMap: {
+                        'shop_churn': '客户流失预警', 'shop_fraud': '交易欺诈检测', 'shop_order': '用户下单预测',
+                        'trans_satisfaction': '乘客满意度', 'trans_delay': '航班延误预测', 'trans_accident': '交通事故定责',
+                        'ind_failure': '设备故障诊断', 'ind_quality': '产品质量控制'
+                    },
+                    manualData: [
+                        { category: '电商零售', scene_name: '用户流失预警', code: 'shop_churn', target: 'Churn', features: 'Tenure, PreferredLoginDevice, CityTier, WarehouseToHome, PreferredPaymentMode, Gender, HourSpendOnApp, NumberOfDeviceRegistered, PreferedOrderCat, SatisfactionScore, MaritalStatus, NumberOfAddress, Complain, OrderAmountHikeFromlastYear, CouponUsed, OrderCount, DaySinceLastOrder, CashbackAmount' },
+                        { category: '电商零售', scene_name: '交易欺诈检测', code: 'shop_fraud', target: 'Class', features: 'V1 - V28, Amount' },
+                        { category: '电商零售', scene_name: '用户下单预测', code: 'shop_order', target: 'ordered', features: 'basket_icon_click, basket_add_list, basket_add_detail, sort_by, image_picker, account_page_click, promo_banner_click, detail_wishlist_add, list_size_dropdown, closed_minibasket_click, checked_delivery_detail, checked_returns_detail, sign_in, saw_checkout, saw_sizecharts, saw_delivery, saw_account_upgrade, saw_homepage, device_mobile, device_computer, device_tablet, returning_user, loc_uk' },
+                        { category: '交通物流', scene_name: '乘客满意度', code: 'trans_satisfaction', target: 'satisfaction', features: 'Gender, Customer_Type, Age, Type_of_Travel, Class, Flight_Distance, Inflight_wifi_service, Departure/Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On-board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service, Cleanliness, Departure_Delay_in_Minutes, Arrival_Delay_in_Minutes' },
+                        { category: '交通物流', scene_name: '航班延误预测', code: 'trans_delay', target: 'DEP_DEL15', features: 'DAY_OF_MONTH, DAY_OF_WEEK, OP_UNIQUE_CARRIER, OP_CARRIER, ORIGIN_AIRPORT_ID, ORIGIN_AIRPORT_SEQ_ID, ORIGIN, DEST_AIRPORT_ID, DEST_AIRPORT_SEQ_ID, DEST, DEP_TIME, DEP_TIME_BLK, DISTANCE' },
+                        { category: '交通物流', scene_name: '交通事故定责', code: 'trans_accident', target: 'Severity', features: 'Source, Start_Lat, Start_Lng, End_Lat, End_Lng, Distance(mi), County, State, Timezone, Airport_Code, Weather_Timestamp, Temperature(F), Wind_Chill(F), Humidity(%), Pressure(in), Visibility(mi), Wind_Direction, Wind_Speed(mph), Precipitation(in), Weather_Condition, Amenity, Bump, Crossing, Give_Way, Junction, No_Exit, Railway, Roundabout, Station, Stop, Traffic_Calming, Traffic_Signal, Turning_Loop, Sunrise_Sunset, Civil_Twilight, Nautical_Twilight, Astronomical_Twilight' },
+                        { category: '工业制造', scene_name: '设备故障诊断', code: 'ind_failure', target: 'Machine_failure', features: 'Type, Air_temperature_[K], Process_temperature_[K], Rotational_speed_[rpm], Torque_[Nm], Tool_wear_[min]' },
+                        { category: '工业制造', scene_name: '产品质量控制', code: 'ind_quality', target: 'Quality (或 Pass/Fail)', features: '0 - 589' }
+                    ]
+                },
+                computed: {
+                    sceneFilters() {
+                        return Object.entries(this.sceneMap).map(([key, value]) => ({ text: value, value: key }));
+                    }
+                },
+                methods: {
+                    getSceneName(key) { return this.sceneMap[key] || key; },
+                    getAlgoName(key) {
+                        const map = { 'random_forest': '随机森林 (RF)', 'gbdt': '梯度提升树 (GBDT)', 'naive_bayes': '朴素贝叶斯 (NB)', 'auto': '自动择优 (Auto)', 'None': '系统处理中' };
+                        return map[key] || key;
+                    },
+                    getFileName(path) {
+                        if (!path) return '-';
+                        return path.split(/[/\\]/).pop().replace(/^\d+_/, '');
+                    },
+                    filterHandler(value, row, column) {
+                        const property = column['property'];
+                        return row[property] === value;
+                    },
+                    beforeUpload(file) {
+                        const isCSV = file.name.endsWith('.csv');
+                        if (!isCSV) this.$message.error('只能上传 CSV 文件!');
+                        return isCSV;
+                    },
+                    handleUploadSuccess(res) {
+                        this.currentFilePath = res.file_path;
+                        this.currentFileName = res.file_name;
+                        this.uploadPercentage = 100;
+                        setTimeout(() => {
+                            this.step = 1;
+                            this.$message.success('上传成功');
+                            this.uploadPercentage = 0; 
+                        }, 500);
+                    },
+                    handleUploadProgress(event, file, fileList) {
+                        this.uploadPercentage = Math.floor(event.percent);
+                    },
+                    handleUploadError() { 
+                        this.uploadPercentage = 0;
+                        this.$message.error('上传失败'); 
+                    },
+                    
+                    startPredict() {
+                        this.loading = true;
+                        this.step = 2; 
+                        this.analysisProgress = 0;
+                        this.currentModelName = 'None';
+                        this.currentModelProgressStatus = '正在初始化环境...';
+                        
+                        axios.post('http://localhost:5000/predict', {
+                            file_path: this.currentFilePath,
+                            model_type: this.modelType,
+                            scene_type: this.selectedScene
+                        }).then(res => {
+                            this.currentTaskId = res.data.task_id;
+                            this.pollTask(this.currentTaskId);
+                        }).catch(err => {
+                            this.loading = false;
+                            this.step = 1;
+                            this.$message.error(err.response?.data?.error || '请求失败');
+                        });
+                    },
+                    
+                    pollTask(taskId) {
+                        if (this.pollingTimer) clearInterval(this.pollingTimer);
+                        this.pollingTimer = setInterval(() => {
+                            axios.get(`http://localhost:5000/task/${taskId}`).then(res => {
+                                const data = res.data;
+                                if (data.current_model) this.currentModelName = data.current_model;
+                                if (data.model_progress_status) this.currentModelProgressStatus = data.model_progress_status;
+                                
+                                if (this.analysisProgress < 95) this.analysisProgress += 2;
+
+                                if (data.status === 'completed') {
+                                    clearInterval(this.pollingTimer);
+                                    this.analysisProgress = 100;
+                                    this.currentFinishTime = data.finish_time; 
+                                    this.finishTask(data.result, '计算完成！');
+                                } else if (data.status === 'failed') {
+                                    clearInterval(this.pollingTimer);
+                                    this.loading = false;
+                                    
+                                    const errorMsg = data.result?.error || '未知错误';
+                                    if (errorMsg.includes('缺少') && errorMsg.includes('关键特征列')) {
+                                        this.validationErrorDialog.message = errorMsg;
+                                        this.validationErrorDialog.visible = true;
+                                    } else {
+                                        this.step = 1; 
+                                        this.$message.error('任务失败: ' + errorMsg);
+                                    }
+                                }
+                            });
+                        }, 2000);
+                    },
+
+                    finishTask(result, successMsg) {
+                        setTimeout(() => {
+                            this.loading = false;
+                            this.predictResult = result;
+                            this.step = 3;
+                            this.activeTab = 'classify';
+                            this.$nextTick(() => this.renderCharts());
+                            this.fetchHistory();
+                            this.$message.success(successMsg || '操作成功');
+                        }, 500);
+                    },
+                    
+                    handleValidationErrorConfirm() {
+                        this.validationErrorDialog.visible = false;
+                        this.step = 1;
+                    },
+
+                    viewDetail(row) {
+                        const loading = this.$loading({ lock: true, text: '正在加载详细数据...', spinner: 'el-icon-loading', background: 'rgba(0, 0, 0, 0.8)' });
+                        axios.get(`http://localhost:5000/task/${row.task_id}`).then(res => {
+                            loading.close();
+                            if (res.data.status === 'completed' && res.data.result) {
+                                this.selectedScene = row.scene_type;
+                                this.modelType = row.model_type;
+                                this.currentFileName = this.getFileName(row.file_path);
+                                this.currentFinishTime = row.finish_time;
+                                this.finishTask(res.data.result, '数据加载完成');
+                            } else {
+                                this.$message.warning('任务数据已过期');
+                            }
+                        }).catch(() => {
+                            loading.close();
+                            this.$message.error('加载失败');
+                        });
+                    },
+
+                    fetchHistory() {
+                        axios.get('http://localhost:5000/history').then(res => { this.historyData = res.data; });
+                    },
+                    reset() {
+                        this.step = 0;
+                        this.predictResult = { accuracy: 0, chart_data: [], distribution: [], final_model: '' };
+                        this.currentFilePath = '';
+                        this.currentFinishTime = '';
+                        this.analysisProgress = 0;
+                        this.uploadPercentage = 0;
+                    },
+                    renderCharts() {
+                        const commonOption = {
+                            backgroundColor: 'transparent',
+                            textStyle: { color: '#8892b0' },
+                            title: { textStyle: { color: '#e6f1ff' } },
+                            tooltip: { backgroundColor: 'rgba(23,42,69,0.9)', borderColor: '#64ffda', textStyle: { color: '#fff' } }
+                        };
+                        const chartColors = ['#64ffda', '#00f2fe', '#f56c6c', '#e6f1ff'];
+
+                        this.$nextTick(() => {
+                            if (this.predictResult.distribution) {
+                                const chart = echarts.init(document.getElementById('pieChart'));
+                                chart.setOption({
+                                    ...commonOption,
+                                    color: chartColors,
+                                    title: { text: '预测分布', left: 'center', textStyle: { color: '#e6f1ff' } },
+                                    series: [{
+                                        type: 'pie', radius: ['40%', '70%'],
+                                        itemStyle: { borderRadius: 5, borderColor: '#172a45', borderWidth: 2 },
+                                        label: { color: '#e6f1ff' },
+                                        data: this.predictResult.distribution
+                                    }]
+                                });
+                            }
+                            if (this.predictResult.confusion_matrix && this.predictResult.confusion_matrix.length > 0) {
+                                const chart = echarts.init(document.getElementById('heatmapChart'));
+                                const total = this.predictResult.confusion_matrix.reduce((s, i) => s + i[2], 0);
+                                const cats = this.predictResult.all_labels_indices;
+                                const maxVal = Math.max(...this.predictResult.confusion_matrix.map(i => i[2]));
+                                chart.setOption({
+                                    ...commonOption,
+                                    title: { text: '混淆矩阵', left: 'center', textStyle: { color: '#e6f1ff' } },
+                                    grid: { top: '15%', bottom: '15%' },
+                                    xAxis: { type: 'category', data: cats, name: '预测', axisLine: { lineStyle: { color: '#8892b0' } }, axisLabel: {color: '#e6f1ff'} },
+                                    yAxis: { type: 'category', data: cats, name: '真实', axisLine: { lineStyle: { color: '#8892b0' } }, axisLabel: {color: '#e6f1ff'} },
+                                    visualMap: { min: 0, max: maxVal, calculable: true, orient: 'horizontal', left: 'center', bottom: '0%', inRange: { color: ['#112240', '#64ffda'] }, textStyle: { color: '#e6f1ff' } },
+                                    series: [{ 
+                                        type: 'heatmap', 
+                                        data: this.predictResult.confusion_matrix, 
+                                        label: { show: true, color: '#e6f1ff', formatter: p => `${p.data[2]}\n${((p.data[2]/total)*100).toFixed(1)}%` } 
+                                    }]
+                                });
+                            }
+                            if (this.predictResult.confusion_matrix) {
+                                const chart = echarts.init(document.getElementById('barChart'));
+                                const cats = this.predictResult.all_labels_indices;
+                                const act = new Array(cats.length).fill(0), pred = new Array(cats.length).fill(0);
+                                this.predictResult.confusion_matrix.forEach(i => { pred[i[0]] += i[2]; act[i[1]] += i[2]; });
+                                
+                                chart.setOption({
+                                    ...commonOption,
+                                    title: { text: '真实 vs 预测', left: 'center', textStyle: { color: '#e6f1ff' } },
+                                    legend: { top: '10%', textStyle: { color: '#e6f1ff' } }, 
+                                    xAxis: { type: 'category', data: cats, axisLabel: { interval: 0, rotate: 15, color: '#e6f1ff' } },
+                                    yAxis: { type: 'value', axisLabel: { color: '#e6f1ff' }, splitLine: { lineStyle: { color: '#233554' } } },
+                                    series: [
+                                        { name: '真实', type: 'bar', data: act, itemStyle: { color: '#8892b0' } },
+                                        { name: '预测', type: 'bar', data: pred, itemStyle: { color: '#64ffda' } }
+                                    ]
+                                });
+                            }
+                            if (this.predictResult.feature_importance && this.predictResult.feature_importance.length > 0) {
+                                const chart = echarts.init(document.getElementById('featureChart'));
+                                const data = [...this.predictResult.feature_importance].reverse();
+                                chart.setOption({
+                                    ...commonOption,
+                                    title: { text: '特征重要性', left: 'center', textStyle: { color: '#e6f1ff' } },
+                                    grid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },
+                                    xAxis: { type: 'value', axisLabel: { color: '#e6f1ff' }, splitLine: { lineStyle: { color: '#233554' } } },
+                                    yAxis: { type: 'category', data: data.map(i => i.name), axisLabel: { color: '#e6f1ff' } },
+                                    series: [{ type: 'bar', data: data.map(i => i.value), itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: '#64ffda' }, { offset: 1, color: '#00f2fe' }]) }, label: { show: true, position: 'right', color: '#fff' } }]
+                                });
+                            }
+                        });
+                    }
+                },
+                mounted() { this.fetchHistory(); },
+                beforeDestroy() { if (this.pollingTimer) clearInterval(this.pollingTimer); }
+            })
+        </script>
+    </body>
+</html>
