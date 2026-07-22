@@ -108,9 +108,12 @@ class SparkClassifier:
                     _B = float(_calibrator.intercept_[0])
                     predictions = predictions.withColumn(
                         "calibrated_conf",
-                        1.0 / (1.0 + exp(-(lit(_A) * vector_to_array(col("rawPrediction"))[1].cast("double") + lit(_B))))
+                   1.0 / (1.0 + exp(-(lit(_A) * vector_to_array(col("rawPrediction"))[1].cast("double") + lit(_B))))
+                )
+                    predictions = predictions.withColumn(
+                        "confidence",
+                        when(col("prediction") == 1.0, col("calibrated_conf")).otherwise(1.0 - col("calibrated_conf"))
                     )
-                    predictions = predictions.withColumn("confidence", col("calibrated_conf"))
                     logger.info(f"  Platt calibration applied: A={_A:.4f}, B={_B:.4f}")
                 except Exception as _ce:
                     logger.warning(f"Calibration apply failed: {_ce}")
