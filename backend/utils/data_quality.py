@@ -12,9 +12,12 @@ def analyze_dataframe(df, scene_type):
     columns = df.columns
     col_stats = {}
     for c in columns:
-        null_count = df.filter(col(c).isNull() | isnan(col(c))).count()
         col_type = [t for n, t in df.dtypes if n == c]
         col_type = col_type[0] if col_type else "unknown"
+        if col_type in ("int", "bigint", "double", "float", "long", "decimal"):
+            null_count = df.filter(col(c).isNull() | isnan(col(c))).count()
+        else:
+            null_count = df.filter(col(c).isNull()).count()
         stats = {"name": c, "type": col_type, "null_count": null_count, "null_pct": round(null_count / total * 100, 1)}
         if col_type in ("int", "bigint", "double", "float", "long", "decimal"):
             try:
