@@ -12,12 +12,40 @@ from utils.logger import get_logger
 from utils.config import PROJECT_ROOT
 from utils.config import UPLOAD_DIR
 from admin_routes import admin_bp
+from utils.preprocessing import clean_column_names
+from utils.data_quality import analyze_dataframe, compare_with_schema
 
 logger = get_logger(__name__)
 
 app = Flask(__name__)
 CORS(app)
 app.register_blueprint(admin_bp)
+
+@app.route("/api/data-quality", methods=["POST"])
+def data_quality():
+    data = request.json
+    file_path = data.get("file_path")
+    scene_type = data.get("scene_type")
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 400
+    try:
+        df = classifier.spark.read.option("header", "true").option("inferSchema", "true").csv(file_path)
+        df = clean_column_names(df)
+        schema_check = compare_with_schema(df, scene_type)
+        dq_report = analyze_dataframe(df, scene_type)
+        if "error" in dq_report:
+            return jsonify({"error": dq_report["error"]}), 400
+        cols_list = list(dq_report["columns"].values())
+        return jsonify({
+            "schema_check": schema_check,
+            "total_rows": dq_report["total_rows"],
+            "total_columns": dq_report["total_columns"],
+            "columns": cols_list,
+            "warnings": dq_report.get("warnings", []),
+        })
+    except Exception as e:
+        logger.exception(f"Data quality check failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # Upload config
 if not os.path.exists(UPLOAD_DIR):
