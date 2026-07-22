@@ -34,3 +34,4 @@ Thumbs.db
 # Spark 临时文件
 *.crc
 *.snappy.parquet
+*.txt
