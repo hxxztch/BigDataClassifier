@@ -9,6 +9,20 @@ __pycache__/
 # 大数据 & JAR
 jars/
 
+# 模型文件（训练产物，不纳入版本控制）
+models/
+
+# 数据库
+*.db
+
+# 上传数据
+data/
+
+# 日志 & 备份
+backend_stdout.txt
+backend_stderr.txt
+*.bak
+
 # 备份 & 存档
 *备份*
 *存档*
@@ -16,3 +30,7 @@ jars/
 # OS
 .DS_Store
 Thumbs.db
+
+# Spark 临时文件
+*.crc
+*.snappy.parquet

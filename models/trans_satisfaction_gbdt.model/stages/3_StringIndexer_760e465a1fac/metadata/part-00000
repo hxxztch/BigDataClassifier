@@ -1,1 +1,0 @@
-{"class":"org.apache.spark.ml.feature.StringIndexerModel","timestamp":1768332905675,"sparkVersion":"3.3.0","uid":"StringIndexer_760e465a1fac","paramMap":{"outputCol":"Type_of_Travel_idx","handleInvalid":"keep","inputCol":"Type_of_Travel"},"defaultParamMap":{"outputCol":"StringIndexer_760e465a1fac__output","handleInvalid":"error","stringOrderType":"frequencyDesc"}}

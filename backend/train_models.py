@@ -1,196 +1,219 @@
-import os
+﻿import os
 import glob
 import time
 import shutil
-from pyspark.sql import SparkSession
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import VectorAssembler, MinMaxScaler, StringIndexer
 from pyspark.ml.classification import NaiveBayes, RandomForestClassifier, GBTClassifier
+from xgboost.spark import SparkXGBClassifier
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
-from pyspark.sql.functions import col, when
+from pyspark.sql.functions import col
 from pyspark import StorageLevel
+import pickle
+import numpy as np
+from sklearn.linear_model import LogisticRegression
 
-# ================= 路径配置 =================
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
-DATA_DIR = os.path.join(CURRENT_DIR, 'datasets')
-MODELS_DIR = os.path.join(PROJECT_ROOT, 'models')
-WAREHOUSE_DIR = os.path.join(PROJECT_ROOT, 'spark-warehouse')
+from utils.config import (
+    _HAS_GPU,
 
-DATASET_META = {
-    'shop_shipping': 'Reached_on_Time_Y_N', 
-    'shop_churn':    'Churn',
-    'shop_fraud':    'Class',
-    'shop_order':    'ordered',
-    'trans_satisfaction': 'satisfaction',
-    'trans_delay':        'DEP_DEL15',
-    'trans_accident':     'Severity',
-    'ind_failure':   'Machine_failure',
-    'ind_quality':   'Quality' 
-}
+    MODELS_DIR, DATA_DIR, DATASET_META,
+    get_spark_builder, AUTO_CANDIDATES, SIMPLE_CLASSIFIERS,
+)
+from utils.preprocessing import (
+    clean_column_names, custom_preprocessing,
+    build_feature_preprocessing_stages,
+    validate_and_filter_columns,
+)
+from utils.logger import get_logger
 
-def get_spark_session():
-    builder = SparkSession.builder \
-        .appName("SmartTrainer_FullPipeline") \
-        .master("local[*]") \
-        .config("spark.driver.memory", "8g") \
-        .config("spark.sql.warehouse.dir", WAREHOUSE_DIR) \
-        .config("spark.ui.enabled", "false")
-    
-    spark = builder.getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
-    return spark
+logger = get_logger(__name__)
 
-def clean_column_names(df):
-    new_cols = [c.strip().replace('.', '_').replace(' ', '_') for c in df.columns]
-    return df.toDF(*new_cols)
-
-def custom_preprocessing(df, task_name):
-    if task_name == 'trans_accident':
-        print("   🧹 [特征工程] 过滤极少量的 Severity 1 和 4...")
-        df = df.filter(col("Severity").isin([2, 3]))
-    elif task_name == 'shop_shipping':
-        print("   🧪 [特征工程] 提取 High_Discount 和 Is_Heavy 特征...")
-        df = df.withColumn("High_Discount", when(col("Discount_offered") > 10, 1).otherwise(0))
-        df = df.withColumn("Is_Heavy", when(col("Weight_in_gms") > 4000, 1).otherwise(0))
-    return df
 
 def train_one_file(spark, file_path):
     filename = os.path.basename(file_path)
     task_name = os.path.splitext(filename)[0]
-    
-    if task_name.endswith('_clean'): task_name = task_name.replace('_clean', '')
+    if task_name.endswith("_clean"):
+        task_name = task_name.replace("_clean", "")
     if task_name not in DATASET_META:
-        print(f"⚠️ 跳过未配置场景文件: {filename}")
+        logger.info(f"Skip unconfigured scene: {filename}")
         return
 
-    print(f"\n" + "="*60)
-    print(f"🔄 正在处理场景: [{task_name}]")
-    
+    logger.info(f"\n{'='*60}\nProcessing scene: [{task_name}]")
     try:
-        # 读取数据
-        sample_df = spark.read.option("header", "true").option("inferSchema", "true").csv(file_path).limit(1000)
-        schema = sample_df.schema
-        df = spark.read.option("header", "true").schema(schema).csv(file_path)
-        
+        df = spark.read.option("header", "true").option("inferSchema", "true").csv(file_path) if not file_path.endswith(".parquet") else spark.read.parquet(file_path)
+        row_count = df.count()
+        spark.conf.set("spark.sql.shuffle.partitions", str(max(200, min(row_count // 50000, 2000))))
         df = clean_column_names(df)
         df = df.fillna(0).fillna("Unknown")
         df = custom_preprocessing(df, task_name)
-        
+
         target_col = DATASET_META.get(task_name)
-        if target_col: target_col = target_col.replace('.', '_').replace(' ', '_')
-        
+        if target_col:
+            target_col = target_col.replace(".", "_").replace(" ", "_")
         if not target_col or target_col not in df.columns:
-            print(f"❌ 错误：找不到目标列 {target_col}")
+            logger.error(f"Target column not found: {target_col}")
             return
 
-        print(f"   🎯 锁定标签列: {target_col}")
-        
-        # === 1. 构建特征预处理流水线 ===
-        feature_cols = [c for c in df.columns if c != target_col and 
-                        c.lower() not in ['id', 'user_id', 'order_id', 'Unnamed: 0', '_c0']]
-        
-        stages = []
-        # 标签索引化
-        stages.append(StringIndexer(inputCol=target_col, outputCol="label").setHandleInvalid("skip"))
-        
-        # 特征索引化 + 向量化
-        assembler_inputs = []
-        for col_name in feature_cols:
-            dtype = [d for n, d in df.dtypes if n == col_name][0]
-            if dtype == 'string':
-                idx_name = f"{col_name}_idx"
-                # 关键：保存StringIndexer模型，否则预测时无法处理字符串
-                stages.append(StringIndexer(inputCol=col_name, outputCol=idx_name).setHandleInvalid("keep"))
-                assembler_inputs.append(idx_name)
-            else:
-                assembler_inputs.append(col_name)
-        
-        stages.append(VectorAssembler(inputCols=assembler_inputs, outputCol="raw_features"))
-        stages.append(MinMaxScaler(inputCol="raw_features", outputCol="features"))
-        
-        # 训练预处理模型
+        logger.info(f"Target column locked: {target_col}")
+        feature_cols = [c for c in df.columns if c != target_col and
+                        c.lower() not in ["id", "user_id", "order_id", "unnamed: 0", "_c0"]]
+
+        # Build and fit preprocessing pipeline
+        stages = build_feature_preprocessing_stages(df, feature_cols, target_col)
         preprocessing_pipeline = Pipeline(stages=stages)
         preprocessing_model = preprocessing_pipeline.fit(df)
         final_df = preprocessing_model.transform(df).select("features", "label")
-        
         final_df.persist(StorageLevel.MEMORY_AND_DISK)
-        
+
         num_classes = final_df.select("label").distinct().count()
         train_data, test_data = final_df.randomSplit([0.8, 0.2], seed=42)
 
-        # 智能过采样
+        # Smart oversampling for imbalanced data
         label_counts = train_data.groupBy("label").count().collect()
-        counts = {row['label']: row['count'] for row in label_counts}
+        counts = {row["label"]: row["count"] for row in label_counts}
         if len(counts) > 1:
             max_count = max(counts.values())
             min_count = min(counts.values())
             if max_count / min_count > 2:
-                print(f"   ⚖️ 执行过采样 (比例 {max_count/min_count:.1f}:1)...")
+                logger.info(f"Oversampling (ratio {max_count/min_count:.1f}:1)...")
                 dfs = []
-                for label, count_val in counts.items():
-                    label_df = train_data.filter(col("label") == label)
+                for label_val, count_val in counts.items():
+                    label_df = train_data.filter(col("label") == label_val)
                     if count_val < max_count:
-                        limit = 50.0 if task_name == 'ind_quality' else 10.0
+                        limit = 50.0 if task_name == "ind_quality" else 10.0
                         ratio = min(max_count / count_val, limit)
                         label_df = label_df.sample(withReplacement=True, fraction=ratio, seed=42)
                     dfs.append(label_df)
                 train_data = dfs[0]
-                for d in dfs[1:]: train_data = train_data.union(d)
+                for d in dfs[1:]:
+                    train_data = train_data.union(d)
                 train_data = train_data.repartition(spark.sparkContext.defaultParallelism)
 
-        # 定义分类器
-        rf = RandomForestClassifier(labelCol="label", featuresCol="features", seed=42, maxBins=128)
+        # Define classifiers
+        rf = RandomForestClassifier(labelCol="label", featuresCol="features", seed=42, maxBins=128, maxDepth=10, numTrees=40)
         gbt = GBTClassifier(labelCol="label", featuresCol="features", seed=42, maxBins=128)
         nb = NaiveBayes(labelCol="label", featuresCol="features")
+        import logging as _l; _l.getLogger('XGBoost-PySpark').setLevel(_l.WARNING)
+        from utils.config import get_xgboost_device
+        device_str = get_xgboost_device()
+        xgb = SparkXGBClassifier(features_col="features", label_col="label", max_depth=6, n_estimators=100, learning_rate=0.1, reg_lambda=1.0, reg_alpha=0.5, subsample=0.8, colsample_bytree=0.8, num_workers=1, device=device_str)
+        classifiers = {"random_forest": rf, "gbdt": gbt, "xgboost": xgb, "naive_bayes": nb}
+        if num_classes > 2:
+            del classifiers["gbdt"]
 
-        classifiers = {'random_forest': rf, 'gbdt': gbt, 'naive_bayes': nb}
-        if num_classes > 2: del classifiers['gbdt']
-
-        # 使用 F1 评估
         evaluator = MulticlassClassificationEvaluator(metricName="f1")
-        rf_grid = ParamGridBuilder().addGrid(rf.maxDepth, [10]).addGrid(rf.numTrees, [40]).build()
-        
-        if not os.path.exists(MODELS_DIR): os.makedirs(MODELS_DIR)
+        if not os.path.exists(MODELS_DIR):
+            os.makedirs(MODELS_DIR)
 
         for algo_name, clf in classifiers.items():
             save_path = os.path.join(MODELS_DIR, f"{task_name}_{algo_name}.model")
-            if os.path.exists(save_path): shutil.rmtree(save_path)
+            if os.path.exists(save_path):
+                shutil.rmtree(save_path)
 
-            print(f"   🚀 正在训练: {algo_name} ...")
+            logger.info(f"Training: {algo_name} ...")
             start = time.time()
-            
-            # 训练分类模型
-            if algo_name == 'random_forest':
-                cv = CrossValidator(estimator=clf, estimatorParamMaps=rf_grid, evaluator=evaluator, numFolds=3)
-                best_clf_model = cv.fit(train_data).bestModel
-            else:
-                best_clf_model = clf.fit(train_data)
 
-            # 评估
+            best_clf_model = clf.fit(train_data)
             preds = best_clf_model.transform(test_data)
+
+            # Platt calibration: fit on validation predictions
+            calibrator = None
+            if "rawPrediction" in preds.columns:
+                try:
+                    local = preds.select("rawPrediction", "label").toPandas()
+                    X = np.array([v[1] for v in local["rawPrediction"]])
+                    y = local["label"].values
+                    calibrator = LogisticRegression(C=1.0, solver="lbfgs")
+                    calibrator.fit(X.reshape(-1, 1), y)
+                    logger.info(f"  {algo_name} calibrated (A={calibrator.coef_[0][0]:.4f}, B={calibrator.intercept_[0]:.4f})")
+
+                except Exception as ce:
+                    logger.warning(f"  {algo_name} calibration skipped: {ce}")
+            # Threshold tuning: find optimal classification threshold
+            best_threshold = 0.5
+            if "probability" in preds.columns:
+                try:
+                    local = preds.select("probability", "label").toPandas()
+                    probs = np.array([v[1] for v in local["probability"]])
+                    y_true = local["label"].values
+                    best_f1_th = 0.0
+                    for th in [round(x, 2) for x in [i * 0.05 for i in range(1, 19)]]:
+                        y_pred = (probs >= th).astype(int)
+                        tp = ((y_pred == 1) & (y_true == 1)).sum()
+                        fp = ((y_pred == 1) & (y_true == 0)).sum()
+                        fn = ((y_pred == 0) & (y_true == 1)).sum()
+                        f1_th = 2 * tp / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else 0
+                        if f1_th > best_f1_th:
+                            best_f1_th = f1_th
+                            best_threshold = th
+                    logger.info(f"  Optimal threshold: {best_threshold:.2f} (F1: {best_f1_th*100:.2f}%)")
+                except Exception as te:
+                    logger.warning(f"  Threshold tuning: {te}")
             f1 = evaluator.evaluate(preds)
             acc = MulticlassClassificationEvaluator(metricName="accuracy").evaluate(preds)
-            
-            # === 核心：拼接并保存完整 PipelineModel ===
-            # full_stages = [预处理的所有stage] + [分类模型]
-            full_stages = preprocessing_model.stages + [best_clf_model]
-            full_pipeline_model = PipelineModel(stages=full_stages)
-            
-            full_pipeline_model.write().overwrite().save(save_path)
-            print(f"     ✅ {algo_name} F1: {f1*100:.2f}% (Acc: {acc*100:.2f}%) - 已保存完整流水线")
+
+            # XGBoost model is already a PipelineModel internally -- save separately to avoid nesting
+            if algo_name == "xgboost":
+                best_clf_model.write().overwrite().save(save_path)
+                preprocessing_model.write().overwrite().save(save_path + ".preprocessing")
+            else:
+                full_stages = preprocessing_model.stages + [best_clf_model]
+                full_pipeline_model = PipelineModel(stages=full_stages)
+                full_pipeline_model.write().overwrite().save(save_path)
+
+            # Save calibrator
+            if calibrator is not None:
+                cal_path = os.path.join(save_path, "calibrator.pkl")
+                with open(cal_path, "wb") as f:
+                    pickle.dump(calibrator, f)
+                logger.info(f"  Calibrator saved: {cal_path}")
+
+            # Save optimal threshold
+            th_path = os.path.join(save_path, "threshold.txt")
+            with open(th_path, "w") as f:
+                f.write(str(round(best_threshold, 2)))
+            logger.info(f"  Threshold: {best_threshold:.2f}")
+
+            # Save model metadata
+            import json as _json
+            meta = {
+                "model_type": algo_name, "scene": task_name,
+                "training_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "f1_score": round(float(f1), 4), "accuracy": round(float(acc), 4),
+                "train_size": row_count, "num_classes": num_classes,
+                "optimal_threshold": round(float(best_threshold), 2),
+                "calibrator_a": round(float(calibrator.coef_[0][0]), 4) if calibrator is not None else None,
+                "calibrator_b": round(float(calibrator.intercept_[0]), 4) if calibrator is not None else None,
+            }
+            with open(os.path.join(save_path, "metadata.json"), "w") as f:
+                _json.dump(meta, f, indent=2)
+            logger.info(f"  Metadata saved")
+
+            elapsed = time.time() - start
+            logger.info(f"  {algo_name} F1: {f1*100:.2f}% (Acc: {acc*100:.2f}%) - {elapsed:.1f}s")
 
         final_df.unpersist()
-
     except Exception as e:
-        print(f"❌ 错误: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Training error: {e}")
 
-if __name__ == '__main__':
-    spark = get_spark_session()
+
+if __name__ == "__main__":
+    spark = get_spark_builder(app_name="SmartTrainer_FullPipeline",
+                              driver_memory="4g").getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
     csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
     for f in csv_files:
         train_one_file(spark, f)
     spark.stop()
+
+
+
+
+
+
+
+
+
+
+
+

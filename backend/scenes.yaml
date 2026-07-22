@@ -1,0 +1,273 @@
+﻿# ====================================================================
+# scenes.yaml — 集中式场景配置
+# 添加新场景只需在此文件中添加一个条目，或将 CSV 放入 datasets/ 后
+# 运行: python manage_scene.py add datasets/新数据.csv
+# ====================================================================
+
+scenes:
+
+  # ── 电商零售 ──────────────────────────────────────────────
+  shop_shipping:
+    name: 商品配送时效预测
+    category: 电商零售
+    description: 预测商品是否准时送达
+    target_col: Reached_on_Time_Y_N
+    label_map:
+      0: On Time
+      1: Delayed
+    required_cols:
+      - Warehouse_block
+      - Mode_of_Shipment
+      - Customer_care_calls
+      - Customer_rating
+      - Cost_of_the_Product
+      - Prior_purchases
+      - Product_importance
+      - Gender
+      - Discount_offered
+      - Weight_in_gms
+      - Reached_on_Time_Y_N
+    preprocessing: shop_shipping
+
+  shop_churn:
+    name: 用户流失预警
+    category: 电商零售
+    description: 预测用户是否将流失
+    target_col: Churn
+    label_map:
+      0: Retain
+      1: Churn
+    required_cols:
+      - Churn
+      - Tenure
+      - PreferredLoginDevice
+      - CityTier
+      - WarehouseToHome
+      - PreferredPaymentMode
+      - Gender
+      - HourSpendOnApp
+      - NumberOfDeviceRegistered
+      - PreferedOrderCat
+      - SatisfactionScore
+      - MaritalStatus
+      - NumberOfAddress
+      - Complain
+      - OrderAmountHikeFromlastYear
+      - CouponUsed
+      - OrderCount
+      - DaySinceLastOrder
+      - CashbackAmount
+
+  shop_fraud:
+    name: 交易欺诈检测
+    category: 电商零售
+    description: 检测交易是否为欺诈
+    target_col: Class
+    label_map:
+      0: Normal
+      1: Fraud
+    required_cols:
+      - V1
+      - V2
+      - V3
+      - V4
+      - V5
+      - V6
+      - V7
+      - V8
+      - V9
+      - V10
+      - V11
+      - V12
+      - V13
+      - V14
+      - V15
+      - V16
+      - V17
+      - V18
+      - V19
+      - V20
+      - V21
+      - V22
+      - V23
+      - V24
+      - V25
+      - V26
+      - V27
+      - V28
+      - Amount
+      - Class
+    features_desc: V1 - V28, Amount
+
+  shop_order:
+    name: 用户下单预测
+    category: 电商零售
+    description: 预测用户是否会下单购买
+    target_col: ordered
+    label_map:
+      0: Browse
+      1: Order
+    required_cols:
+      - basket_icon_click
+      - basket_add_list
+      - basket_add_detail
+      - sort_by
+      - image_picker
+      - account_page_click
+      - promo_banner_click
+      - detail_wishlist_add
+      - list_size_dropdown
+      - closed_minibasket_click
+      - checked_delivery_detail
+      - checked_returns_detail
+      - sign_in
+      - saw_checkout
+      - saw_sizecharts
+      - saw_delivery
+      - saw_account_upgrade
+      - saw_homepage
+      - device_mobile
+      - device_computer
+      - device_tablet
+      - returning_user
+      - loc_uk
+      - ordered
+    features_desc: basket_icon_click, basket_add_list, …, loc_uk
+
+  trans_satisfaction:
+    name: 乘客满意度
+    category: 交通物流
+    description: 预测航空乘客满意度
+    target_col: satisfaction
+    label_map:
+      0: Neutral/Dissatisfied
+      1: Satisfied
+    required_cols:
+      - Gender
+      - Customer_Type
+      - Age
+      - Type_of_Travel
+      - Class
+      - Flight_Distance
+      - Inflight_wifi_service
+      - Departure/Arrival_time_convenient
+      - Ease_of_Online_booking
+      - Gate_location
+      - Food_and_drink
+      - Online_boarding
+      - Seat_comfort
+      - Inflight_entertainment
+      - On-board_service
+      - Leg_room_service
+      - Baggage_handling
+      - Checkin_service
+      - Inflight_service
+      - Cleanliness
+      - Departure_Delay_in_Minutes
+      - Arrival_Delay_in_Minutes
+      - satisfaction
+    features_desc: Gender, Customer_Type, …, Arrival_Delay_in_Minutes
+
+  trans_delay:
+    name: 航班延误预测
+    category: 交通物流
+    description: 预测航班是否延误
+    target_col: DEP_DEL15
+    label_map:
+      0: On Time
+      1: Delayed
+    required_cols:
+      - DAY_OF_MONTH
+      - DAY_OF_WEEK
+      - OP_UNIQUE_CARRIER
+      - OP_CARRIER
+      - ORIGIN_AIRPORT_ID
+      - ORIGIN_AIRPORT_SEQ_ID
+      - ORIGIN
+      - DEST_AIRPORT_ID
+      - DEST_AIRPORT_SEQ_ID
+      - DEST
+      - DEP_TIME
+      - DEP_TIME_BLK
+      - DISTANCE
+      - DEP_DEL15
+    features_desc: DAY_OF_MONTH, DAY_OF_WEEK, …, DISTANCE
+
+  trans_accident:
+    name: 交通事故定责
+    category: 交通物流
+    description: 预测交通事故严重程度
+    target_col: Severity
+    label_map:
+      2: Level 2
+      3: Level 3
+    required_cols:
+      - Source
+      - Start_Lat
+      - Start_Lng
+      - End_Lat
+      - End_Lng
+      - Distance(mi)
+      - County
+      - State
+      - Timezone
+      - Airport_Code
+      - Weather_Timestamp
+      - Temperature(F)
+      - Wind_Chill(F)
+      - Humidity(%)
+      - Pressure(in)
+      - Visibility(mi)
+      - Wind_Direction
+      - Wind_Speed(mph)
+      - Precipitation(in)
+      - Weather_Condition
+      - Amenity
+      - Bump
+      - Crossing
+      - Give_Way
+      - Junction
+      - No_Exit
+      - Railway
+      - Roundabout
+      - Station
+      - Stop
+      - Traffic_Calming
+      - Traffic_Signal
+      - Turning_Loop
+      - Sunrise_Sunset
+      - Civil_Twilight
+      - Nautical_Twilight
+      - Astronomical_Twilight
+      - Severity
+    preprocessing: trans_accident
+
+  ind_failure:
+    name: 设备故障诊断
+    category: 工业制造
+    description: 预测设备是否将故障
+    target_col: Machine_failure
+    label_map:
+      0: Normal
+      1: Failure
+    required_cols:
+      - Type
+      - Air_temperature_[K]
+      - Process_temperature_[K]
+      - Rotational_speed_[rpm]
+      - Torque_[Nm]
+      - Tool_wear_[min]
+      - Machine_failure
+    features_desc: Type, Air_temperature_[K], …, Tool_wear_[min]
+
+  ind_quality:
+    name: 产品质量控制
+    category: 工业制造
+    description: 预测产品质量是否合格
+    target_col: Quality
+    label_map:
+      0: Pass
+      1: Fail
+    required_cols: []
+    preprocessing: ind_quality
+    features_desc: '0 - 589'
