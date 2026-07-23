@@ -1,6 +1,7 @@
 ﻿import os, sys, json, threading, csv, shutil, glob
 from collections import Counter
 from flask import Blueprint, request, jsonify
+from utils.version_manager import list_versions as _list_ver, activate as _act_ver, load as _load_reg
 
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _BACKEND_DIR)
@@ -56,6 +57,7 @@ def list_scenes():
     for sid, s in sorted(scenes.items()):
         entry = dict(s); entry["id"] = sid
         entry["models"] = _model_status(sid)
+        entry["current_version"] = _load_reg(_MODELS_DIR).get(sid, {}).get("current_version", 1)
         with _lock: entry["training"] = _training_tasks.get(sid, {"status": "idle"})
         result.append(entry)
     return jsonify(result)
@@ -179,3 +181,48 @@ def training_status_all():
 def training_status_one(scene_id):
     with _lock: s = _training_tasks.get(scene_id, {"status": "idle"})
     return jsonify(s)
+
+@admin_bp.route("/api/admin/versions/<scene_id>", methods=["GET"])
+def get_versions(scene_id):
+    try:
+        vers = _list_ver(_MODELS_DIR, scene_id)
+        reg = _load_reg(_MODELS_DIR)
+        cur = reg.get(scene_id, {}).get("current_version", 1)
+        return jsonify({"versions": vers, "current_version": cur})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@admin_bp.route("/api/admin/versions/<scene_id>/activate", methods=["POST"])
+def activate_version(scene_id):
+    data = request.get_json()
+    version = data.get("version")
+    if not version:
+        return jsonify({"error": "Missing version"}), 400
+    ok, msg = _act_ver(_MODELS_DIR, scene_id, int(version))
+    if not ok:
+        return jsonify({"error": msg}), 400
+    return jsonify({"ok": True, "message": msg})
+@admin_bp.route("/api/admin/datasets", methods=["GET"])
+def list_datasets():
+    path = request.args.get("path", "")
+    if not path or not os.path.isdir(path):
+        path = _DATA_DIR
+    files = []
+    for f in sorted(os.listdir(path)):
+        full = os.path.join(path, f)
+        files.append({"name": f, "path": full, "is_dir": os.path.isdir(full), "size": os.path.getsize(full) if os.path.isfile(full) else 0})
+    return jsonify({"path": path, "files": files, "parent": os.path.dirname(path)})
+
+@admin_bp.route("/api/admin/datasets/upload", methods=["POST"])
+def upload_dataset():
+    if "file" not in request.files:
+        return jsonify({"error": "No file"}), 400
+    f = request.files["file"]
+    target_dir = request.form.get("target_dir", _DATA_DIR)
+    os.makedirs(target_dir, exist_ok=True)
+    from werkzeug.utils import secure_filename
+    save_path = os.path.join(target_dir, secure_filename(f.filename))
+    f.save(save_path)
+    return jsonify({"ok": True, "path": save_path, "name": f.filename})
+
+

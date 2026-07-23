@@ -11,6 +11,7 @@ from utils.config import (
     MODELS_DIR, DATASET_META, SCENE_LABEL_MAP,
     get_spark_builder, AUTO_CANDIDATES,
 )
+from utils.version_manager import get_base as _version_base
 from utils.preprocessing import (
     clean_column_names, custom_preprocessing,
     validate_and_filter_columns, get_feature_cols,
@@ -35,7 +36,7 @@ class SparkClassifier:
 
     def _load_model(self, model_type, scene_type):
         model_name = f"{scene_type}_{model_type}.model"
-        model_path = os.path.join(self.models_dir, model_name)
+        model_path = os.path.join(_version_base(self.models_dir, scene_type), model_name)
         if not os.path.exists(model_path):
             return None, f"Model file not found: {model_name}"
         # XGBoost is saved as raw SparkXGBClassifierModel + separate preprocessing
@@ -99,7 +100,7 @@ class SparkClassifier:
                 predictions = predictions.withColumn("confidence", lit(0.0))
 
             # --- Platt scaling calibration (overrides raw confidence if calibrator exists) ---
-            _cal_path = os.path.join(self.models_dir, f"{scene_type}_{model_type}.model", "calibrator.pkl")
+            _cal_path = os.path.join(_version_base(self.models_dir, scene_type), f"{scene_type}_{model_type}.model", "calibrator.pkl")
             if os.path.exists(_cal_path) and "rawPrediction" in predictions.columns:
                 try:
                     with open(_cal_path, "rb") as _cf:
@@ -119,7 +120,7 @@ class SparkClassifier:
                     logger.warning(f"Calibration apply failed: {_ce}")
 
             # Apply optimal threshold if available
-            _th_path = os.path.join(self.models_dir, f"{scene_type}_{model_type}.model", "threshold.txt")
+            _th_path = os.path.join(_version_base(self.models_dir, scene_type), f"{scene_type}_{model_type}.model", "threshold.txt")
             if os.path.exists(_th_path) and "probability" in predictions.columns:
                 try:
                     with open(_th_path) as _f:

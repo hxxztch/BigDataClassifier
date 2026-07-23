@@ -4,7 +4,7 @@ import time
 import shutil
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import VectorAssembler, MinMaxScaler, StringIndexer
-from pyspark.ml.classification import NaiveBayes, RandomForestClassifier, GBTClassifier
+from pyspark.ml.classification import NaiveBayes, GBTClassifier
 from xgboost.spark import SparkXGBClassifier
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.sql.functions import col
@@ -25,6 +25,7 @@ from utils.preprocessing import (
     validate_and_filter_columns,
 )
 from utils.logger import get_logger
+from utils.version_manager import next_version as _next_ver, register as _reg_ver, get_base as _get_base
 
 logger = get_logger(__name__)
 
@@ -90,14 +91,13 @@ def train_one_file(spark, file_path):
                 train_data = train_data.repartition(spark.sparkContext.defaultParallelism)
 
         # Define classifiers
-        rf = RandomForestClassifier(labelCol="label", featuresCol="features", seed=42, maxBins=128, maxDepth=10, numTrees=40)
         gbt = GBTClassifier(labelCol="label", featuresCol="features", seed=42, maxBins=128)
         nb = NaiveBayes(labelCol="label", featuresCol="features")
         import logging as _l; _l.getLogger('XGBoost-PySpark').setLevel(_l.WARNING)
         from utils.config import get_xgboost_device
         device_str = get_xgboost_device()
         xgb = SparkXGBClassifier(features_col="features", label_col="label", max_depth=6, n_estimators=100, learning_rate=0.1, reg_lambda=1.0, reg_alpha=0.5, subsample=0.8, colsample_bytree=0.8, num_workers=1, device=device_str)
-        classifiers = {"random_forest": rf, "gbdt": gbt, "xgboost": xgb, "naive_bayes": nb}
+        classifiers = {"xgboost": xgb, "gbdt": gbt, "naive_bayes": nb}
         if num_classes > 2:
             del classifiers["gbdt"]
 
@@ -105,8 +105,14 @@ def train_one_file(spark, file_path):
         if not os.path.exists(MODELS_DIR):
             os.makedirs(MODELS_DIR)
 
+        # Version management
+        _train_ver = _next_ver(MODELS_DIR, task_name)
+        _train_base = os.path.join(MODELS_DIR, "v" + str(_train_ver)) if _train_ver > 1 else MODELS_DIR
+        if _train_ver > 1 and not os.path.exists(_train_base):
+            os.makedirs(_train_base)
+
         for algo_name, clf in classifiers.items():
-            save_path = os.path.join(MODELS_DIR, f"{task_name}_{algo_name}.model")
+            save_path = os.path.join(_train_base, f"{task_name}_{algo_name}.model")
             if os.path.exists(save_path):
                 shutil.rmtree(save_path)
 
@@ -189,18 +195,32 @@ def train_one_file(spark, file_path):
                 _json.dump(meta, f, indent=2)
             logger.info(f"  Metadata saved")
 
+        # Register version
+            _train_metrics = {}
+            for _algo in classifiers:
+                _mp = os.path.join(_train_base, task_name + "_" + _algo + ".model", "metadata.json")
+                if os.path.exists(_mp):
+                    with open(_mp) as _f:
+                        _m = json.load(_f)
+                    _train_metrics[_algo] = {"accuracy": _m.get("accuracy"), "f1_score": _m.get("f1_score"), "train_size": _m.get("train_size")}
+            _total = df.count()
+            _reg_ver(MODELS_DIR, task_name, _train_ver, _train_metrics, dataset=task_name + ".csv", rows=_total)
+            logger.info("  Registered version " + str(_train_ver) + " (" + str(len(_train_metrics)) + " models)")
+
             elapsed = time.time() - start
             logger.info(f"  {algo_name} F1: {f1*100:.2f}% (Acc: {acc*100:.2f}%) - {elapsed:.1f}s")
 
         final_df.unpersist()
     except Exception as e:
+        import traceback as _tb
+        _tb.print_exc()
         logger.exception(f"Training error: {e}")
 
 
 if __name__ == "__main__":
     spark = get_spark_builder(app_name="SmartTrainer_FullPipeline",
-                              driver_memory="4g").getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
+                              driver_memory="8g").getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
     csv_files = glob.glob(os.path.join(DATA_DIR, "*.csv"))
     for f in csv_files:
         train_one_file(spark, f)
