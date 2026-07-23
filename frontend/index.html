@@ -443,6 +443,47 @@
                         </el-table>
                     </div>
 
+                        <div style="margin-top:30px;border-top:1px solid #233554;padding-top:20px;">
+                            <h3 style="margin:0 0 15px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">模型训练</h3>
+                            <div style="display:flex;gap:15px;flex-wrap:wrap;">
+                                <div style="flex:2;min-width:300px;">
+                                    <div style="margin-bottom:10px;">
+                                        <label style="color:#8892b0;font-size:13px;">数据集目录</label>
+                                        <el-input v-model="trainingPath" size="small" placeholder="数据集目录路径" style="margin-top:5px;">
+                                            <el-button slot="append" icon="el-icon-folder-opened" @click="browseDatasetDir"></el-button>
+                                        </el-input>
+                                    </div>
+                                    <div style="margin-bottom:10px;">
+                                        <label style="color:#8892b0;font-size:13px;">上传新数据集</label>
+                                        <div style="display:flex;gap:10px;margin-top:5px;">
+                                            <input type="file" ref="datasetFileInput" accept=".csv" style="display:none">
+                                            <el-input size="small" :value="uploadFileName || ''" placeholder="选择 CSV 文件" readonly></el-input>
+                                            <el-button size="small" @click="$refs.datasetFileInput.click()">选择文件</el-button>
+                                            <el-button size="small" type="primary" @click="uploadDataset" :disabled="!uploadFile">上传</el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="flex:1;min-width:200px;">
+                                    <div style="margin-bottom:10px;">
+                                        <label style="color:#8892b0;font-size:13px;">场景</label>
+                                        <el-select v-model="trainingScene" size="small" style="width:100%;margin-top:5px;">
+                                            <el-option v-for="(sn,si) in adminSceneList" :key="si" :label="sn.name" :value="sn.id"></el-option>
+                                        </el-select>
+                                    </div>
+                                    <el-button type="primary" size="small" @click="startTraining" :loading="trainingRunning" :disabled="trainingRunning" style="width:100%;">
+                                        {{ trainingRunning ? '训练中...' : '开始训练' }}
+                                    </el-button>
+                                </div>
+                            </div>
+                            <div v-if="trainingResult" style="margin-top:15px;background:#112240;padding:12px;border-radius:6px;">
+                                <div v-for="(r,ai) in trainingResult" :key="ai" style="margin-bottom:5px;font-size:13px;">
+                                    <el-tag :type="r.status==='ok'?'success':'danger'" size="small" style="margin-right:8px;">{{ r.algo }}</el-tag>
+                                    <span v-if="r.status==='ok'" style="color:#64ffda;">acc={{ (r.accuracy*100).toFixed(1) }}% f1={{ (r.f1*100).toFixed(1) }}%</span>
+                                    <span v-else style="color:#ff6b6b;">{{ r.error }}</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- ========== ???? ========== -->
                         <div style="margin-top:30px;border-top:1px solid #233554;padding-top:20px;">
                             <h3 style="margin:0 0 15px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">????</h3>
@@ -494,6 +535,21 @@
                             <div>
                                 <el-button type="primary" icon="el-icon-plus" @click="showAddSceneDialog = true" style="margin-right:10px;">添加场景</el-button>
                                 <el-button type="primary" icon="el-icon-refresh" @click="fetchAdminScenes">刷新</el-button>
+                    <el-dialog title="浏览目录" :visible.sync="browseDialogVisible" width="600px">
+                        <div style="margin-bottom:10px;color:#8892b0;font-size:13px;">当前目录: {{ browsePath }}</div>
+                        <el-table :data="browseFiles" size="small" stripe style="width:100%;cursor:pointer;" @row-click="browseSelectFile">
+                            <el-table-column label="名称">
+                                <template slot-scope="s"><span :style="{color:s.row.is_dir?'#64ffda':'#e6f1ff'}">{{ s.row.is_dir ? '📁 ' : '📄 ' }}{{ s.row.name }}</span></template>
+                            </el-table-column>
+                            <el-table-column prop="size" label="大小" width="100">
+                                <template slot-scope="s"><span v-if="!s.row.is_dir">{{ (s.row.size/1024).toFixed(1) }} KB</span></template>
+                            </el-table-column>
+                        </el-table>
+                        <div style="margin-top:10px;text-align:right;">
+                            <el-button size="small" @click="browseGoUp">上级目录</el-button>
+                            <el-button size="small" type="primary" @click="browseSelectCurrent">选择当前目录</el-button>
+                        </div>
+                    </el-dialog>
                         <el-dialog title="版本管理" :visible.sync="versionDialogVisible" width="500px">
                             <el-table :data="versionList" size="small" stripe>
                                 <el-table-column prop="version" label="版本" width="60"></el-table-column>
@@ -636,6 +692,15 @@
                     analyzeResult: null,
                     addSceneConfig: {},
                     adminSceneList: [],
+                    trainingPath: "",
+                    trainingScene: "",
+                    trainingRunning: false,
+                    trainingResult: null,
+                    uploadFile: null,
+                    uploadFileName: "",
+                    browseDialogVisible: false,
+                    browsePath: "",
+                    browseFiles: [],
                     trainingPath: "",
                     trainingScene: "",
                     trainingRunning: false,
@@ -1045,7 +1110,85 @@
                         setTimeout(poll, 2000);
                     },
 
-                    trainScene(row) {
+                    
+                    browseDatasetDir() {
+                        this.browsePath = this.trainingPath || "";
+                        axios.get("/api/admin/datasets", {params:{path: this.browsePath}}).then(r => {
+                            this.browseFiles = r.data.files || [];
+                            this.browseDialogVisible = true;
+                        });
+                    },
+                    browseGoUp() {
+                        if (!this.browsePath) return;
+                        let p = this.browsePath.substring(0, this.browsePath.lastIndexOf("\\"));
+                        if (!p) p = "C:\\";
+                        axios.get("/api/admin/datasets", {params:{path: p}}).then(r => {
+                            this.browseFiles = r.data.files || [];
+                            this.browsePath = p;
+                        });
+                    },
+                    browseSelectCurrent() {
+                        this.trainingPath = this.browsePath;
+                        this.browseDialogVisible = false;
+                    },
+                    browseSelectFile(row) {
+                        if (row.is_dir) {
+                            this.browsePath = row.path;
+                            axios.get("/api/admin/datasets", {params:{path: row.path}}).then(r => {
+                                this.browseFiles = r.data.files || [];
+                            });
+                        } else if (row.name.endsWith(".csv")) {
+                            this.trainingPath = row.path;
+                            this.browseDialogVisible = false;
+                        }
+                    },
+                    handleDatasetFileChange(e) {
+                        this.uploadFile = e.target.files[0];
+                        this.uploadFileName = this.uploadFile ? this.uploadFile.name : "";
+                    },
+                    uploadDataset() {
+                        if (!this.uploadFile) return;
+                        let fd = new FormData();
+                        fd.append("file", this.uploadFile);
+                        fd.append("target_dir", this.trainingPath || "");
+                        axios.post("/api/admin/datasets/upload", fd).then(r => {
+                            this.$message.success("上传成功: " + r.data.name);
+                            this.uploadFileName = "";
+                            this.uploadFile = null;
+                        }).catch(e => this.$message.error("上传失败: " + e.message));
+                    },
+                    startTraining() {
+                        if (!this.trainingScene) { this.$message.warning("请选择场景"); return; }
+                        if (!this.trainingPath) { this.$message.warning("请选择数据集目录"); return; }
+                        this.trainingRunning = true;
+                        this.trainingResult = null;
+                        axios.post("/api/admin/scenes/" + this.trainingScene + "/train", {dataset_path: this.trainingPath}).then(r => {
+                            this.$message.success("训练已启动");
+                            setTimeout(() => this.pollTrainingStatus(), 3000);
+                        }).catch(e => {
+                            this.trainingRunning = false;
+                            this.$message.error("启动失败: " + e.message);
+                        });
+                    },
+                    pollTrainingStatus() {
+                        let scene = this.trainingScene;
+                        let poll = () => {
+                            axios.get("/api/admin/scenes/" + scene + "/training-status").then(r => {
+                                let s = r.data;
+                                if (s.status === "completed") {
+                                    this.trainingRunning = false;
+                                    this.trainingResult = s.results || [{algo:"完成",status:"ok",accuracy:1,f1:1}];
+                                    this.fetchAdminScenes();
+                                } else if (s.status === "failed") {
+                                    this.trainingRunning = false;
+                                    this.trainingResult = [{algo:"错误",status:"fail",error:s.error||"训练失败"}];
+                                } else {
+                                    setTimeout(poll, 2000);
+                                }
+                            }).catch(() => setTimeout(poll, 2000));
+                        };
+                        setTimeout(poll, 2000);
+                    },trainScene(row) {
                         axios.post('/api/admin/scenes/'+row.id+'/train').then(r => {
                             alert(row.id+' 训练已启动');
                         });

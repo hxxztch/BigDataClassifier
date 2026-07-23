@@ -145,10 +145,13 @@ def train_scene(scene_id):
     sd = _load_yaml()
     if scene_id not in sd.get("scenes", {}):
         return jsonify({"error": "Not found"}), 404
-    csv_path = os.path.join(_DATA_DIR, f"{scene_id}.csv")
-    if not os.path.isfile(csv_path):
-        for f in glob.glob(os.path.join(_DATA_DIR, "*.csv")):
-            if scene_id in os.path.basename(f): csv_path = f; break
+    data = request.get_json() or {}
+    csv_path = data.get("dataset_path", "")
+    if not csv_path:
+        csv_path = os.path.join(_DATA_DIR, f"{scene_id}.csv")
+        if not os.path.isfile(csv_path):
+            for f in glob.glob(os.path.join(_DATA_DIR, "*.csv")):
+                if scene_id in os.path.basename(f): csv_path = f; break
     if not os.path.isfile(csv_path):
         return jsonify({"error": "No CSV"}), 400
     from utils.config import get_spark_builder

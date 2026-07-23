@@ -4,7 +4,7 @@ import time
 import shutil
 from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import VectorAssembler, MinMaxScaler, StringIndexer
-from pyspark.ml.classification import NaiveBayes, GBTClassifier
+from pyspark.ml.classification import NaiveBayes, GBTClassifier, RandomForestClassifier
 from xgboost.spark import SparkXGBClassifier
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.sql.functions import col
@@ -97,7 +97,8 @@ def train_one_file(spark, file_path):
         from utils.config import get_xgboost_device
         device_str = get_xgboost_device()
         xgb = SparkXGBClassifier(features_col="features", label_col="label", max_depth=6, n_estimators=100, learning_rate=0.1, reg_lambda=1.0, reg_alpha=0.5, subsample=0.8, colsample_bytree=0.8, num_workers=1, device=device_str)
-        classifiers = {"xgboost": xgb, "gbdt": gbt, "naive_bayes": nb}
+        rf = RandomForestClassifier(labelCol="label", featuresCol="features", seed=42, maxBins=128, maxDepth=8, numTrees=20)
+        classifiers = {"xgboost": xgb, "gbdt": gbt, "naive_bayes": nb, "random_forest": rf}
         if num_classes > 2:
             del classifiers["gbdt"]
 
