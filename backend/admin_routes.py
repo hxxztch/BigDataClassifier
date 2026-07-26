@@ -1,4 +1,5 @@
-﻿import os, sys, json, threading, csv, shutil, glob
+﻿import os, sys, json, threading, csv, shutil, glob, subprocess
+import traceback
 from collections import Counter
 from flask import Blueprint, request, jsonify
 from utils.version_manager import list_versions as _list_ver, activate as _act_ver, load as _load_reg
@@ -40,14 +41,37 @@ def _model_status(scene_id):
             result[mt] = {"exists": False}
     return result
 
-def _run_training(spark, scene_id, csv_path):
-    with _lock: _training_tasks[scene_id] = {"status": "running", "progress": 0, "error": None}
-    try:
-        from train_models import train_one_file
-        train_one_file(spark, csv_path)
-        with _lock: _training_tasks[scene_id] = {"status": "completed", "progress": 100}
-    except Exception as e:
-        with _lock: _training_tasks[scene_id] = {"status": "failed", "error": str(e)}
+def _train_subprocess(scene_id, csv_path):
+    """Run training in isolated subprocess with clean MKL environment."""
+    _status = {"status": "running", "progress": 0, "error": None}
+    with _lock:
+        _training_tasks[scene_id] = dict(_status)
+    train_worker = os.path.join(_BACKEND_DIR, "train_worker.py")
+    if os.path.exists(train_worker):
+        env = os.environ.copy()
+        env["MKL_NUM_THREADS"] = "1"
+        env["OMP_NUM_THREADS"] = "1"
+        env["OPENBLAS_NUM_THREADS"] = "1"
+        env["MKL_THREADING_LAYER"] = "sequential"
+        env["NUMEXPR_NUM_THREADS"] = "1"
+        env["VECLIB_MAXIMUM_THREADS"] = "1"
+        env["SPARK_MASTER_URL"] = "local[2]"
+        try:
+            proc = subprocess.Popen([sys.executable, train_worker, scene_id, csv_path],
+                                   cwd=_BACKEND_DIR, env=env)
+            with _lock:
+                _training_tasks[scene_id]["_proc"] = proc
+                _training_tasks[scene_id]["_status_file"] = os.path.join(
+                    _BACKEND_DIR, "train_status_" + scene_id + ".json")
+        except Exception as e:
+            traceback.print_exc()
+            _status = {"status": "failed", "error": str(e)}
+            with _lock:
+                _training_tasks[scene_id] = _status
+    else:
+        _status = {"status": "failed", "error": "train_worker.py not found"}
+        with _lock:
+            _training_tasks[scene_id] = _status
 
 @admin_bp.route("/api/admin/scenes", methods=["GET"])
 def list_scenes():
@@ -154,10 +178,8 @@ def train_scene(scene_id):
                 if scene_id in os.path.basename(f): csv_path = f; break
     if not os.path.isfile(csv_path):
         return jsonify({"error": "No CSV"}), 400
-    from utils.config import get_spark_builder
-    spark = get_spark_builder(app_name=f"AdminTrain_{scene_id}", driver_memory="4g").getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
-    t = threading.Thread(target=_run_training, args=(spark, scene_id, csv_path))
+    # Run training in-process using shared Spark (no new Spark session)
+    t = threading.Thread(target=_train_subprocess, args=(scene_id, csv_path))
     t.daemon = True; t.start()
     return jsonify({"ok": True, "scene_id": scene_id, "status": "started"})
 
@@ -166,24 +188,45 @@ def train_all():
     sd = _load_yaml()
     scenes = sd.get("scenes", {})
     if not scenes: return jsonify({"error": "No scenes"}), 400
-    from utils.config import get_spark_builder
     for sid in scenes:
         csv_path = os.path.join(_DATA_DIR, f"{sid}.csv")
         if os.path.isfile(csv_path):
-            spark = get_spark_builder(app_name=f"AdminTrain_{sid}", driver_memory="4g").getOrCreate()
-            spark.sparkContext.setLogLevel("ERROR")
-            t = threading.Thread(target=_run_training, args=(spark, sid, csv_path))
+            t = threading.Thread(target=_train_subprocess, args=(sid, csv_path))
             t.daemon = True; t.start()
     return jsonify({"ok": True})
 
 @admin_bp.route("/api/admin/scenes/training-status", methods=["GET"])
 def training_status_all():
-    with _lock: return jsonify(dict(_training_tasks))
+    with _lock: return jsonify({k: {kk: vv for kk, vv in v.items() if not kk.startswith("_")} for k, v in _training_tasks.items()})
 
 @admin_bp.route("/api/admin/scenes/<scene_id>/training-status", methods=["GET"])
 def training_status_one(scene_id):
-    with _lock: s = _training_tasks.get(scene_id, {"status": "idle"})
-    return jsonify(s)
+    try:
+        with _lock:
+            s = dict(_training_tasks.get(scene_id, {"status": "idle"}))
+            proc = s.pop("_proc", None)
+            sf = s.pop("_status_file", None)
+        if proc is not None and sf and os.path.exists(sf):
+            try:
+                with open(sf, "r", encoding="utf-8") as f:
+                    fs = json.load(f)
+                for k in ("status", "progress", "error", "accuracy", "best_algo", "progress_text", "results"):
+                    if k in fs:
+                        s[k] = fs[k]
+                if s.get("status") in ("completed", "failed"):
+                    try: proc.poll()
+                    except: pass
+                    with _lock: del _training_tasks[scene_id]
+            except: pass
+        elif proc is not None:
+            ret = proc.poll()
+            if ret is not None:
+                s["status"] = "failed"
+                s["error"] = "Training process exited unexpectedly"
+                with _lock: del _training_tasks[scene_id]
+        return jsonify(s)
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 @admin_bp.route("/api/admin/versions/<scene_id>", methods=["GET"])
 def get_versions(scene_id):

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -187,6 +187,26 @@
         .el-select-dropdown__item span { visibility: visible !important; }
         .el-select-dropdown__item.hover, .el-select-dropdown__item:hover { background-color: #172a45 !important; color: #fff !important; }
         .el-select-dropdown__item.selected { color: #64ffda !important; font-weight: bold; }
+    
+        /* 管理员子标签 (Radio Button) 深色调适配 */
+        .el-radio-button__inner {
+            background-color: #0b1a2f !important;
+            border-color: #233554 !important;
+            color: #8892b0 !important;
+            font-size: 14px !important;
+        }
+        .el-radio-button__orig-radio:checked + .el-radio-button__inner {
+            background-color: rgba(100, 255, 218, 0.1) !important;
+            border-color: #64ffda !important;
+            color: #64ffda !important;
+            box-shadow: none !important;
+        }
+        .el-radio-button:first-child .el-radio-button__inner {
+            border-left-color: #233554 !important;
+        }
+        .el-radio-button__inner:hover {
+            color: #64ffda !important;
+        }
     </style>
 </head>
 <body><!--CODEX_V4-->
@@ -443,162 +463,100 @@
                         </el-table>
                     </div>
 
-                        
-
-                        <!-- ========== ???? ========== -->
-                        <div style="margin-top:30px;border-top:1px solid #233554;padding-top:20px;">
-                            <h3 style="margin:0 0 15px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">????</h3>
-                            <div style="display:flex;gap:15px;flex-wrap:wrap;">
-                                <div style="flex:2;min-width:300px;">
-                                    <div style="margin-bottom:10px;">
-                                        <label style="color:#8892b0;font-size:13px;">?????</label>
-                                        <el-input v-model="trainingPath" size="small" placeholder="???????" style="margin-top:5px;">
-                                            <el-button slot="append" icon="el-icon-folder-opened" @click="browseDatasetDir"></el-button>
-                                        </el-input>
-                                    </div>
-                                    <div style="margin-bottom:10px;">
-                                        <label style="color:#8892b0;font-size:13px;">??????</label>
-                                        <div style="display:flex;gap:10px;margin-top:5px;">
-                                            <input type="file" ref="datasetFileInput" accept=".csv" style="display:none" @change="handleDatasetFileChange">
-                                            <el-input size="small" :value="uploadFileName || ''" placeholder="?? CSV ??" readonly></el-input>
-                                            <el-button size="small" @click="$refs.datasetFileInput.click()">????</el-button>
-                                            <el-button size="small" type="primary" @click="uploadDataset" :disabled="!uploadFile">??</el-button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="flex:1;min-width:200px;">
-                                    <div style="margin-bottom:10px;">
-                                        <label style="color:#8892b0;font-size:13px;">??</label>
-                                        <el-select v-model="trainingScene" size="small" style="width:100%;margin-top:5px;">
-                                            <el-option v-for="(sn,si) in sceneOptions" :key="si" :label="sn.name" :value="sn.code"></el-option>
-                                        </el-select>
-                                    </div>
-                                    <el-button type="primary" size="small" @click="startTraining" :loading="trainingRunning" :disabled="trainingRunning" style="width:100%;">
-                                        {{ trainingRunning ? '???...' : '????' }}
-                                    </el-button>
-                                </div>
-                            </div>
-                            <div v-if="trainingResult" style="margin-top:15px;background:#112240;padding:12px;border-radius:6px;">
-                                <div v-for="(r,ai) in trainingResult" :key="ai" style="margin-bottom:5px;font-size:13px;">
-                                    <el-tag :type="r.status==='ok'?'success':'danger'" size="small" style="margin-right:8px;">{{ r.algo }}</el-tag>
-                                    <span v-if="r.status==='ok'" style="color:#64ffda;">acc={{ (r.accuracy*100).toFixed(1) }}% f1={{ (r.f1*100).toFixed(1) }}%</span>
-                                    <span v-else style="color:#ff6b6b;">{{ r.error }}</span>
-                                </div>
-                            </div>
-                        </div>
-
                 </el-tab-pane>
-                <el-tab-pane name="admin">
+                                <el-tab-pane name="admin">
                     <span slot="label"><i class="el-icon-setting"></i> 系统管理</span>
                     <div style="padding:20px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                            <h3 style="margin:0;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">场景管理</h3>
-                            <div>
-                                <el-button type="primary" icon="el-icon-plus" @click="showAddSceneDialog = true" style="margin-right:10px;">添加场景</el-button>
-                                <el-button type="primary" icon="el-icon-refresh" @click="fetchAdminScenes">刷新</el-button>
-                    <el-dialog title="浏览目录" :visible.sync="browseDialogVisible" width="600px">
-                        <div style="margin-bottom:10px;color:#8892b0;font-size:13px;">当前目录: {{ browsePath }}</div>
-                        <el-table :data="browseFiles" size="small" stripe style="width:100%;cursor:pointer;" @row-click="browseSelectFile">
-                            <el-table-column label="名称">
-                                <template slot-scope="s"><span :style="{color:s.row.is_dir?'#64ffda':'#e6f1ff'}">{{ s.row.is_dir ? '📁 ' : '📄 ' }}{{ s.row.name }}</span></template>
-                            </el-table-column>
-                            <el-table-column prop="size" label="大小" width="100">
-                                <template slot-scope="s"><span v-if="!s.row.is_dir">{{ (s.row.size/1024).toFixed(1) }} KB</span></template>
-                            </el-table-column>
-                        </el-table>
-                        <div style="margin-top:30px;border-top:1px solid #233554;padding-top:20px;">
-                            <h3 style="margin:0 0 15px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">模型训练</h3>
-                            <div style="display:flex;gap:15px;flex-wrap:wrap;">
-                                <div style="flex:2;min-width:300px;">
-                                    <div style="margin-bottom:10px;">
-                                        <label style="color:#8892b0;font-size:13px;">数据集目录</label>
-                                        <el-input v-model="trainingPath" size="small" placeholder="数据集目录路径" style="margin-top:5px;">
-                                            <el-button slot="append" icon="el-icon-folder-opened" @click="browseDatasetDir"></el-button>
-                                        </el-input>
-                                    </div>
-                                    <div style="margin-bottom:10px;">
-                                        <label style="color:#8892b0;font-size:13px;">上传新数据集</label>
-                                        <div style="display:flex;gap:10px;margin-top:5px;">
-                                            <input type="file" ref="datasetFileInput" accept=".csv" style="display:none">
-                                            <el-input size="small" :value="uploadFileName || ''" placeholder="选择 CSV 文件" readonly></el-input>
-                                            <el-button size="small" @click="$refs.datasetFileInput.click()">选择文件</el-button>
-                                            <el-button size="small" type="primary" @click="uploadDataset" :disabled="!uploadFile">上传</el-button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="flex:1;min-width:200px;">
-                                    <div style="margin-bottom:10px;">
-                                        <label style="color:#8892b0;font-size:13px;">场景</label>
-                                        <el-select v-model="trainingScene" size="small" style="width:100%;margin-top:5px;">
-                                            <el-option v-for="(sn,si) in adminSceneList" :key="si" :label="sn.name" :value="sn.id"></el-option>
-                                        </el-select>
-                                    </div>
-                                    <el-button type="primary" size="small" @click="startTraining" :loading="trainingRunning" :disabled="trainingRunning" style="width:100%;">
-                                        {{ trainingRunning ? '训练中...' : '开始训练' }}
-                                    </el-button>
+                        <div style="margin-bottom:15px;">
+                            <el-radio-group v-model="adminSubTab" size="medium">
+                                <el-radio-button label="scenes">场景管理</el-radio-button>
+                                <el-radio-button label="training">模型训练</el-radio-button>
+                            </el-radio-group>
+                            <el-dialog title="版本管理" :visible.sync="versionDialogVisible" width="500px">
+                                <el-table :data="versionList" size="small" stripe>
+                                    <el-table-column prop="version" label="版本" width="60"></el-table-column>
+                                    <el-table-column prop="trained_at" label="训练时间" width="170"></el-table-column>
+                                    <el-table-column label="状态" width="60">
+                                        <template slot-scope="vs"><el-tag v-if="vs.row.is_current" size="small" type="success">当前</el-tag></template>
+                                    </el-table-column>
+                                    <el-table-column label="操作" width="80">
+                                        <template slot-scope="vs">
+                                            <el-button v-if="!vs.row.is_current" type="primary" size="small" @click="activateVersion(vs.row.version)">启用</el-button>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                            </el-dialog>
+                        </div>
+                        <div v-show="adminSubTab==='scenes'">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                                <h3 style="margin:0;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">场景管理</h3>
+                                <div>
+                                    <el-button type="primary" icon="el-icon-plus" @click="showAddSceneDialog = true" style="margin-right:10px;">添加场景</el-button>
+                                    <el-button type="primary" icon="el-icon-refresh" @click="fetchAdminScenes">刷新</el-button>
                                 </div>
                             </div>
-                            <div v-if="trainingResult" style="margin-top:15px;background:#112240;padding:12px;border-radius:6px;">
-                                <div v-for="(r,ai) in trainingResult" :key="ai" style="margin-bottom:5px;font-size:13px;">
-                                    <el-tag :type="r.status==='ok'?'success':'danger'" size="small" style="margin-right:8px;">{{ r.algo }}</el-tag>
-                                    <span v-if="r.status==='ok'" style="color:#64ffda;">acc={{ (r.accuracy*100).toFixed(1) }}% f1={{ (r.f1*100).toFixed(1) }}%</span>
-                                    <span v-else style="color:#ff6b6b;">{{ r.error }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="margin-top:10px;text-align:right;">
-                            <el-button size="small" @click="browseGoUp">上级目录</el-button>
-                            <el-button size="small" type="primary" @click="browseSelectCurrent">选择当前目录</el-button>
-                        </div>
-                    </el-dialog>
-                        <el-dialog title="版本管理" :visible.sync="versionDialogVisible" width="500px">
-                            <el-table :data="versionList" size="small" stripe>
-                                <el-table-column prop="version" label="版本" width="60"></el-table-column>
-                                <el-table-column prop="trained_at" label="训练时间" width="170"></el-table-column>
-                                <el-table-column label="状态" width="60">
-                                    <template slot-scope="vs"><el-tag v-if="vs.row.is_current" size="small" type="success">当前</el-tag></template>
+                            <el-table v-if="adminSceneList" :data="adminSceneList" stripe style="width:100%">
+                                <el-table-column prop="id" label="ID" width="140"></el-table-column>
+                                <el-table-column prop="name" label="名称" width="150"></el-table-column>
+                                <el-table-column prop="target_col" label="目标列" width="130"></el-table-column>
+                                <el-table-column label="版本" width="90" align="center">
+                                    <template slot-scope="scope">
+                                        <el-tag size="small">{{ scope.row.current_version || 1 }}</el-tag>
+                                        <el-button type="text" size="small" @click="showVersionDlg(scope.row)">切换</el-button>
+                                    </template>
                                 </el-table-column>
-                                <el-table-column label="操作" width="80">
-                                    <template slot-scope="vs">
-                                        <el-button v-if="!vs.row.is_current" type="primary" size="small" @click="activateVersion(vs.row.version)">启用</el-button>
+                                <el-table-column label="模型状态" min-width="280">
+                                    <template slot-scope="scope">
+                                        <el-tag v-for="(m,mt) in scope.row.models" :key="mt" size="small" :class="m.exists ? 'tag-trained' : 'tag-untrained'">
+                                            {{ mt }}<span v-if="m.exists && m.accuracy !== undefined"> {{ (m.accuracy*100).toFixed(1) }}%</span>
+                                        </el-tag>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="训练状态" width="110">
+                                    <template slot-scope="scope">
+                                        <el-tag v-if="scope.row.training.status==='idle'" size="small" type="info">就绪</el-tag>
+                                        <el-tag v-else-if="scope.row.training.status==='running'" size="small" type="warning">训练中...</el-tag>
+                                        <el-tag v-else-if="scope.row.training.status==='completed'" size="small" type="success">已完成</el-tag>
+                                        <el-tag v-else size="small" type="danger">失败</el-tag>
+                                    </template>
+                                </el-table-column>
+                                <el-table-column label="操作" width="150" fixed="right">
+                                    <template slot-scope="scope">
+                                        <el-button type="text" size="small" icon="el-icon-info" @click="showSceneDetail(scope.row)" style="color:#64ffda;">详情</el-button>
+                                        <el-button type="text" size="small" icon="el-icon-delete" @click="deleteScene(scope.row.id)" style="color:#ff6b6b;">删除</el-button>
                                     </template>
                                 </el-table-column>
                             </el-table>
-                        </el-dialog>
+                        </div>
+                                                <div v-show="adminSubTab==='training'" style="padding-top:20px;">
+                            <h3 style="margin:0 0 20px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">模型训练</h3>
+                            <div style="max-width:600px;">
+                                <div style="margin-bottom:20px;">
+                                    <label style="color:#8892b0;font-size:14px;display:block;margin-bottom:8px;">训练数据集</label>
+                                    <input type="file" ref="datasetFileInput" accept=".csv" style="display:none" @change="handleDatasetFileChange">
+                                    <el-input size="medium" :value="uploadFileName || ''" placeholder="点击右侧选择 CSV 文件..." readonly>
+                                        <el-button slot="append" @click="$refs.datasetFileInput.click()" icon="el-icon-folder-opened">选择文件</el-button>
+                                    </el-input>
+                                </div>
+                                <div style="margin-bottom:20px;">
+                                    <label style="color:#8892b0;font-size:14px;display:block;margin-bottom:8px;">选择场景</label>
+                                    <el-select v-model="trainingScene" size="medium" style="width:100%;" placeholder="请选择要训练的场景">
+                                        <el-option v-for="(sn,si) in adminSceneList" :key="si" :label="sn.name" :value="sn.id"></el-option>
+                                    </el-select>
+                                </div>
+                                <el-button type="primary" size="medium" @click="startTraining" :loading="trainingRunning" :disabled="trainingRunning" style="width:100%;margin-bottom:20px;" icon="el-icon-cpu">
+                                    {{ trainingRunning ? '训练中...' : '开始训练' }}
+                                </el-button>
+                                <div v-if="trainingResult" style="margin-top:15px;background:#112240;padding:16px;border-radius:6px;">
+                                    <div v-for="(r,ai) in trainingResult" :key="ai" style="margin-bottom:6px;font-size:14px;">
+                                        <el-tag :type="r.status==='ok'?'success':'danger'" size="medium" style="margin-right:8px;">{{ r.algo }}</el-tag>
+                                        <span v-if="r.status==='ok'" style="color:#64ffda;">acc={{ (r.accuracy*100).toFixed(1) }}% f1={{ (r.f1*100).toFixed(1) }}%</span>
+                                        <span v-else style="color:#ff6b6b;">{{ r.error }}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <el-table v-if="adminSceneList" :data="adminSceneList" stripe style="width:100%">
-                            <el-table-column prop="id" label="ID" width="140"></el-table-column>
-                            <el-table-column prop="name" label="名称" width="150"></el-table-column>
-                            <el-table-column prop="target_col" label="目标列" width="130"></el-table-column>
-                            <el-table-column label="版本" width="90" align="center">
-                                <template slot-scope="scope">
-                                    <el-tag size="small">{{ scope.row.current_version || 1 }}</el-tag>
-                                    <el-button type="text" size="small" @click="showVersionDlg(scope.row)">切换</el-button>
-                                </template>
-                            </el-table-column>
-                            <el-table-column label="模型状态" min-width="280">
-                                <template slot-scope="scope">
-                                    <el-tag v-for="(m,mt) in scope.row.models" :key="mt" size="small" :class="m.exists ? 'tag-trained' : 'tag-untrained'">
-                                        {{ mt }}<span v-if="m.exists && m.accuracy !== undefined"> {{ (m.accuracy*100).toFixed(1) }}%</span>
-                                    </el-tag>
-                                </template>
-                            </el-table-column>
-                            <el-table-column label="训练状态" width="110">
-                                <template slot-scope="scope">
-                                    <el-tag v-if="scope.row.training.status==='idle'" size="small" type="info">就绪</el-tag>
-                                    <el-tag v-else-if="scope.row.training.status==='running'" size="small" type="warning">训练中...</el-tag>
-                                    <el-tag v-else-if="scope.row.training.status==='completed'" size="small" type="success">已完成</el-tag>
-                                    <el-tag v-else size="small" type="danger">失败</el-tag>
-                                </template>
-                            </el-table-column>
-                            <el-table-column label="操作" width="150" fixed="right">
-                                <template slot-scope="scope">
-                                    <el-button type="text" size="small" icon="el-icon-info" @click="showSceneDetail(scope.row)" style="color:#64ffda;">详情</el-button>
-                                    <el-button type="text" size="small" icon="el-icon-delete" @click="deleteScene(scope.row.id)" style="color:#ff6b6b;">删除</el-button>
-                                </template>
-                            </el-table-column>
-                        </el-table>
+
                     </div>
                 </el-tab-pane>
             </el-tabs>
@@ -670,6 +628,7 @@
                 el: '#app',
                 data: {
                     activeTab: 'classify',
+                    adminSubTab: 'scenes',
                     step: 0,
                     loading: false,
                     loadingText: 'Engines Starting...',
@@ -699,18 +658,6 @@
                     trainingResult: null,
                     uploadFile: null,
                     uploadFileName: "",
-                    browseDialogVisible: false,
-                    browsePath: "",
-                    browseFiles: [],
-                    trainingPath: "",
-                    trainingScene: "",
-                    trainingRunning: false,
-                    trainingResult: null,
-                    uploadFile: null,
-                    uploadFileName: "",
-                    browseDialogVisible: false,
-                    browsePath: "",
-                    browseFiles: [],
                     versionDialogVisible: false,
                     versionList: [],
                     currentVersionScene: null,
@@ -1031,144 +978,29 @@
                     }
                     ,
 
-
-                    browseDatasetDir() {
-                        this.browsePath = this.trainingPath || "";
-                        axios.get("/api/admin/datasets", {params:{path: this.browsePath}}).then(r => {
-                            this.browseFiles = r.data.files || [];
-                            this.browseDialogVisible = true;
-                        });
-                    },
-                    browseGoUp() {
-                        if (!this.browsePath) return;
-                        let p = this.browsePath.substring(0, this.browsePath.lastIndexOf("\\"));
-                        if (!p) p = "C:\\";
-                        axios.get("/api/admin/datasets", {params:{path: p}}).then(r => {
-                            this.browseFiles = r.data.files || [];
-                            this.browsePath = p;
-                        });
-                    },
-                    browseSelectCurrent() {
-                        this.trainingPath = this.browsePath;
-                        this.browseDialogVisible = false;
-                    },
-                    browseSelectFile(row) {
-                        if (row.is_dir) {
-                            this.browsePath = row.path;
-                            axios.get("/api/admin/datasets", {params:{path: row.path}}).then(r => {
-                                this.browseFiles = r.data.files || [];
-                            });
-                        } else if (row.name.endsWith(".csv")) {
-                            this.trainingPath = row.path;
-                            this.browseDialogVisible = false;
-                        }
-                    },
                     handleDatasetFileChange(e) {
                         this.uploadFile = e.target.files[0];
                         this.uploadFileName = this.uploadFile ? this.uploadFile.name : "";
                     },
-                    uploadDataset() {
-                        if (!this.uploadFile) return;
-                        let fd = new FormData();
-                        fd.append("file", this.uploadFile);
-                        fd.append("target_dir", this.trainingPath || "");
-                        axios.post("/api/admin/datasets/upload", fd).then(r => {
-                            this.$message.success("????: " + r.data.name);
-                            this.uploadFileName = "";
-                            this.uploadFile = null;
-                        }).catch(e => this.$message.error("????: " + e.message));
-                    },
                     startTraining() {
-                        if (!this.trainingScene) { this.$message.warning("?????"); return; }
-                        if (!this.trainingPath) { this.$message.warning("????????"); return; }
-                        this.trainingRunning = true;
-                        this.trainingResult = null;
-                        axios.post("/api/admin/scenes/" + this.trainingScene + "/train", {}).then(r => {
-                            this.$message.success("?????");
-                            setTimeout(() => this.pollTrainingStatus(), 3000);
-                        }).catch(e => {
-                            this.trainingRunning = false;
-                            this.$message.error("????: " + e.message);
-                        });
-                    },
-                    pollTrainingStatus() {
-                        let scene = this.trainingScene;
-                        let poll = () => {
-                            axios.get("/api/admin/scenes/" + scene + "/training-status").then(r => {
-                                let s = r.data;
-                                if (s.status === "completed") {
-                                    this.trainingRunning = false;
-                                    this.trainingResult = s.results || [{algo:"ok",status:"ok",accuracy:1,f1:1}];
-                                    this.fetchAdminScenes();
-                                } else if (s.status === "failed") {
-                                    this.trainingRunning = false;
-                                    this.trainingResult = [{algo:"error",status:"fail",error:s.error||"????"}];
-                                } else {
-                                    setTimeout(poll, 2000);
-                                }
-                            }).catch(() => setTimeout(poll, 2000));
-                        };
-                        setTimeout(poll, 2000);
-                    },
-
-                    
-                    browseDatasetDir() {
-                        this.browsePath = this.trainingPath || "";
-                        axios.get("/api/admin/datasets", {params:{path: this.browsePath}}).then(r => {
-                            this.browseFiles = r.data.files || [];
-                            this.browseDialogVisible = true;
-                        });
-                    },
-                    browseGoUp() {
-                        if (!this.browsePath) return;
-                        let p = this.browsePath.substring(0, this.browsePath.lastIndexOf("\\"));
-                        if (!p) p = "C:\\";
-                        axios.get("/api/admin/datasets", {params:{path: p}}).then(r => {
-                            this.browseFiles = r.data.files || [];
-                            this.browsePath = p;
-                        });
-                    },
-                    browseSelectCurrent() {
-                        this.trainingPath = this.browsePath;
-                        this.browseDialogVisible = false;
-                    },
-                    browseSelectFile(row) {
-                        if (row.is_dir) {
-                            this.browsePath = row.path;
-                            axios.get("/api/admin/datasets", {params:{path: row.path}}).then(r => {
-                                this.browseFiles = r.data.files || [];
-                            });
-                        } else if (row.name.endsWith(".csv")) {
-                            this.trainingPath = row.path;
-                            this.browseDialogVisible = false;
-                        }
-                    },
-                    handleDatasetFileChange(e) {
-                        this.uploadFile = e.target.files[0];
-                        this.uploadFileName = this.uploadFile ? this.uploadFile.name : "";
-                    },
-                    uploadDataset() {
-                        if (!this.uploadFile) return;
-                        let fd = new FormData();
-                        fd.append("file", this.uploadFile);
-                        fd.append("target_dir", this.trainingPath || "");
-                        axios.post("/api/admin/datasets/upload", fd).then(r => {
-                            this.$message.success("上传成功: " + r.data.name);
-                            this.uploadFileName = "";
-                            this.uploadFile = null;
-                        }).catch(e => this.$message.error("上传失败: " + e.message));
-                    },
-                    startTraining() {
+                        if (!this.uploadFile) { this.$message.warning("请选择训练数据集"); return; }
                         if (!this.trainingScene) { this.$message.warning("请选择场景"); return; }
-                        if (!this.trainingPath) { this.$message.warning("请选择数据集目录"); return; }
                         this.trainingRunning = true;
                         this.trainingResult = null;
-                        axios.post("/api/admin/scenes/" + this.trainingScene + "/train", {dataset_path: this.trainingPath}).then(r => {
+                        let fd = new FormData();
+                        fd.append("file", this.uploadFile);
+                        // target_dir defaults to datasets/;
+                        axios.post("/api/admin/datasets/upload", fd).then(r => {
+                            this.trainingPath = r.data.path || "";
+                            this.uploadFileName = "";
+                            this.uploadFile = null;
+                            return axios.post("/api/admin/scenes/" + this.trainingScene + "/train", {dataset_path: this.trainingPath});
+                        }).then(r => {
                             this.$message.success("训练已启动");
                             setTimeout(() => this.pollTrainingStatus(), 3000);
                         }).catch(e => {
                             this.trainingRunning = false;
-                            this.$message.error("启动失败: " + e.message);
+                            this.$message.error(e.response && e.response.data && e.response.data.error ? e.response.data.error : "操作失败");
                         });
                     },
                     pollTrainingStatus() {
@@ -1189,7 +1021,10 @@
                             }).catch(() => setTimeout(poll, 2000));
                         };
                         setTimeout(poll, 2000);
-                    },trainScene(row) {
+                    },
+
+                    
+                    trainScene(row) {
                         axios.post('/api/admin/scenes/'+row.id+'/train').then(r => {
                             alert(row.id+' 训练已启动');
                         });

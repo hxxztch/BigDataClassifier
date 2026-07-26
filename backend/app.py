@@ -9,7 +9,7 @@ import time
 from database import init_db, create_task_entry, update_task_result, update_task_progress, get_history, get_task_status
 from spark_utils import SparkClassifier
 from utils.logger import get_logger
-from utils.config import PROJECT_ROOT
+from utils.config import PROJECT_ROOT, set_shared_spark
 from utils.config import UPLOAD_DIR
 from admin_routes import admin_bp
 from utils.preprocessing import clean_column_names
@@ -56,6 +56,7 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB
 # Init
 init_db()
 classifier = SparkClassifier()
+set_shared_spark(classifier.spark)
 
 @app.route('/debug/models', methods=['GET'])
 def debug_models():
@@ -176,3 +177,4 @@ def history():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+

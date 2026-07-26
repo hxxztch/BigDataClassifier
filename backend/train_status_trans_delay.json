@@ -1,0 +1,1 @@
+{"status": "completed", "progress": 100, "error": null, "accuracy": 0.8941, "best_algo": "xgboost", "progress_text": "????", "results": [{"algo": "随机森林", "status": "ok", "accuracy": 0.8651, "f1": 0.8026}, {"algo": "XGBoost", "status": "ok", "accuracy": 0.8941, "f1": 0.866}, {"algo": "朴素贝叶斯", "status": "ok", "accuracy": 0.8415, "f1": 0.7997}]}

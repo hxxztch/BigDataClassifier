@@ -1,7 +1,6 @@
 ﻿import os
 from pyspark.ml import PipelineModel
 from pyspark.ml.classification import RandomForestClassificationModel, GBTClassificationModel, NaiveBayesModel
-from xgboost.spark import SparkXGBClassifierModel
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.functions import vector_to_array
 from pyspark.sql.functions import col, lit, when, exp
@@ -39,40 +38,40 @@ class SparkClassifier:
         model_path = os.path.join(_version_base(self.models_dir, scene_type), model_name)
         if not os.path.exists(model_path):
             return None, f"Model file not found: {model_name}"
-        # XGBoost is saved as raw SparkXGBClassifierModel + separate preprocessing
-        if model_type == "xgboost":
-            try:
-                from xgboost.spark import SparkXGBClassifierModel
-                xgb_model = SparkXGBClassifierModel.load(model_path)
-                prep_path = model_path + ".preprocessing"
-                if os.path.exists(prep_path):
-                    prep_model = PipelineModel.load(prep_path)
-                    combined_stages = prep_model.stages + [xgb_model]
-                    return PipelineModel(stages=combined_stages), None
-                else:
-                    model = PipelineModel.load(model_path)
-                    return model, None
-            except Exception as e:
-                return None, f"XGBoost model load failed: {e}"
+        
+        # All models now use sklearn (pickle-based), trained by train_sklearn.py
+        pkl_name = "sklearn_model.pkl"
+        pkl_path = os.path.join(model_path, pkl_name)
+        if not os.path.exists(pkl_path):
+            return None, f"Sklearn model not found at {pkl_path}"
+        
         try:
-            model = PipelineModel.load(model_path)
-            return model, None
-        except Exception:
-            pass
-        loaders = {
-            "random_forest": RandomForestClassificationModel,
-            "gbdt": GBTClassificationModel,
-            "xgboost": SparkXGBClassifierModel,
-            "naive_bayes": NaiveBayesModel,
-        }
-        loader = loaders.get(model_type)
-        if not loader:
-            return None, f"Unsupported model: {model_type}"
-        try:
-            model = loader.load(model_path)
-            return model, None
+            with open(pkl_path, "rb") as pf:
+                sk_model = pickle.load(pf)
+            
+            # Load shared preprocessing PipelineModel
+            base_dir = os.path.dirname(model_path)
+            parent_dir = os.path.dirname(base_dir)
+            shared_prep = os.path.join(base_dir, f"{scene_type}_preprocessing.model")
+            shared_prep_root = os.path.join(parent_dir, f"{scene_type}_preprocessing.model")
+            prep_path = os.path.join(model_path, "preprocessing")
+            prep_legacy = model_path + ".preprocessing"
+            
+            prep_model = None
+            for pp in [shared_prep, shared_prep_root, prep_path, prep_legacy]:
+                if os.path.exists(pp):
+                    try:
+                        prep_model = PipelineModel.load(pp)
+                        break
+                    except:
+                        pass
+            
+            if prep_model is None:
+                return None, f"Preprocessing model not found for {scene_type}"
+            
+            return {"model_type": model_type, "preprocessing": prep_model, "sklearn_model": sk_model}, None
         except Exception as e:
-            return None, f"Model load failed: {e}"
+            return None, f"Model load failed for {model_type}: {e}"
 
     def _run_model(self, df, model_type, scene_type, task_id, has_label, target_col, feature_cols):
         model, err = self._load_model(model_type, scene_type)
@@ -84,17 +83,76 @@ class SparkClassifier:
                 model_progress_status=f"Evaluating {model_type}..."
             )
             logger.info(f"Running: {model_type} ...")
-            is_pipeline = isinstance(model, PipelineModel)
-            if not is_pipeline and "features" not in df.columns:
-                df_prep = prepare_features_fallback(df, feature_cols)
-                if df_prep is None:
-                    return 0.0, 0.0, None, [], "Feature prep failed"
-                df = df_prep
-            predictions = model.transform(df)
+            # Check if model is sklearn-based (dict with preprocessing + sklearn_model)
+            _prob_is_array = False
+            if isinstance(model, dict):
+                prep_model = model["preprocessing"]
+                sk_model = model.get("sklearn_model")
+                prepped = prep_model.transform(df)
+                import pandas as pd
+                import numpy as np
+                # Convert features column: handles Vector objects, string reprs, and numpy arrays
+                def _safe_feat(v):
+                    if hasattr(v, 'toArray'):
+                        return v.toArray()
+                    if isinstance(v, str):
+                        import re
+                        m = re.match(r'\((\d+),\s*\[(.*?)\],\s*\[(.*?)\]\)', v)
+                        if m:
+                            size = int(m.group(1))
+                            idx = [int(i.strip()) for i in m.group(2).split(',') if i.strip()]
+                            vals = [float(x.strip()) for x in m.group(3).split(',') if x.strip()]
+                            arr = np.zeros(size)
+                            if idx:
+                                arr[idx] = vals
+                            return arr
+                        try:
+                            return np.array(eval(v))
+                        except:
+                            pass
+                    return np.asarray(v, dtype=np.float64)
+                # Add row ID for join-back after sklearn prediction
+                from pyspark.sql.functions import monotonically_increasing_id, col as _col
+                from pyspark.sql.types import StructType, StructField, LongType, DoubleType, ArrayType
+                prepped = prepped.withColumn("_rid", monotonically_increasing_id()).cache()
+                _ = prepped.count()  # materialize cached DataFrame
+
+                # Extract features to pandas (only features + _rid)
+                feat_pdf = prepped.select("_rid", "features").toPandas()
+                X = np.asarray([_safe_feat(v) for v in feat_pdf["features"]], dtype=np.float64)
+
+                if sk_model is not None:
+                    y_pred = sk_model.predict(X)
+                    y_proba = sk_model.predict_proba(X)
+                else:
+                    y_pred = np.zeros(len(X))
+                    y_proba = np.zeros((len(X), 2)); y_proba[:, 0] = 1.0
+
+                # Build minimal prediction DataFrame and join back (avoids wide pandas->Spark + UDFs)
+                pred_schema = StructType([
+                    StructField("_rid", LongType(), True),
+                    StructField("prediction", DoubleType(), True),
+                    StructField("probability", ArrayType(DoubleType()), True),
+                ])
+                pred_rows = [(int(feat_pdf["_rid"].iloc[i]), float(y_pred[i]), y_proba[i].tolist())
+                             for i in range(len(y_pred))]
+                pred_spark = self.spark.createDataFrame(pred_rows, schema=pred_schema)
+                predictions = prepped.drop("features").join(pred_spark, "_rid").drop("_rid")
+                predictions = predictions.withColumn("rawPrediction", _col("probability"))
+                _prob_is_array = True
+            else:
+                is_pipeline = isinstance(model, PipelineModel)
+                if not is_pipeline and "features" not in df.columns:
+                    df_prep = prepare_features_fallback(df, feature_cols)
+                    if df_prep is None:
+                        return 0.0, 0.0, None, [], "Feature prep failed"
+                    df = df_prep
+                predictions = model.transform(df)
             if "probability" in predictions.columns:
                 # Take the max probability as confidence (the model's certainty in its own prediction)
-                predictions = predictions.withColumn("confidence_0", vector_to_array(col("probability"))[0].cast("double"))
-                predictions = predictions.withColumn("confidence_1", vector_to_array(col("probability"))[1].cast("double"))
+                _pcol = col("probability") if _prob_is_array else vector_to_array(col("probability"))
+                predictions = predictions.withColumn("confidence_0", _pcol[0].cast("double"))
+                predictions = predictions.withColumn("confidence_1", _pcol[1].cast("double"))
                 predictions = predictions.withColumn("confidence", when(col("prediction") == 0.0, col("confidence_0")).otherwise(col("confidence_1")))
             else:
                 predictions = predictions.withColumn("confidence", lit(0.0))
@@ -107,9 +165,10 @@ class SparkClassifier:
                         _calibrator = pickle.load(_cf)
                     _A = float(_calibrator.coef_[0][0])
                     _B = float(_calibrator.intercept_[0])
+                    _rcol = col("rawPrediction") if _prob_is_array else vector_to_array(col("rawPrediction"))
                     predictions = predictions.withColumn(
                         "calibrated_conf",
-                   1.0 / (1.0 + exp(-(lit(_A) * vector_to_array(col("rawPrediction"))[1].cast("double") + lit(_B))))
+                   1.0 / (1.0 + exp(-(lit(_A) * _rcol[1].cast("double") + lit(_B))))
                 )
                     predictions = predictions.withColumn(
                         "confidence",
@@ -126,9 +185,10 @@ class SparkClassifier:
                     with open(_th_path) as _f:
                         _opt_th = float(_f.read().strip())
                     predictions = predictions.withColumn("prediction_orig", col("prediction"))
+                    _tcol = col("probability") if _prob_is_array else vector_to_array(col("probability"))
                     predictions = predictions.withColumn(
                         "prediction",
-                        when(vector_to_array(col("probability"))[1] >= _opt_th, 1.0).otherwise(0.0)
+                        when(_tcol[1] >= _opt_th, 1.0).otherwise(0.0)
                     )
                     predictions = predictions.withColumn("prediction", col("prediction").cast("double"))
                     logger.info(f"  Threshold applied: {_opt_th:.2f}")
@@ -231,11 +291,11 @@ class SparkClassifier:
                 pred_val = int(row["prediction"])
                 pred_str = label_map.get(pred_val, str(pred_val))
                 act_str = "-"
-                if has_label and row[1] is not None:
-                    act_val = int(row[1])
+                confidence_val = float(row["confidence"]) if "confidence" in row else 0.0
+                if has_label and target_col in row:
+                    act_val = int(row[target_col])
                     act_str = label_map.get(act_val, str(act_val))
-                    confidence_val = float(row["confidence"]) if "confidence" in row else 0.0
-                    chart_data.append({"id": i + 1, "actual": act_str, "predicted": pred_str, "confidence": round(confidence_val, 4)})
+                chart_data.append({"id": i + 1, "actual": act_str, "predicted": pred_str, "confidence": round(confidence_val, 4)})
             update_task_progress(
                 task_id, current_model=final_model_name,
                 model_progress_status="Complete"
@@ -258,4 +318,3 @@ class SparkClassifier:
     def stop(self):
         self.spark.stop()
         logger.info("SparkSession stopped")
-

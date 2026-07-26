@@ -143,6 +143,11 @@ def get_spark_builder(app_name="SparkPredictor", driver_memory="4g", executor_me
         .config("spark.executor.memory", executor_memory) \
         .config("spark.sql.warehouse.dir", WAREHOUSE_DIR) \
         .config("spark.ui.enabled", "false") \
+        .config("spark.ui.showConsoleProgress", "false") \
+        .config("spark.driver.extraJavaOptions",
+                "-Dcom.github.fommil.netlib.BLAS=com.github.fommil.netlib.F2jBLAS " +
+                "-Dcom.github.fommil.netlib.LAPACK=com.github.fommil.netlib.F2jLAPACK " +
+                "-Dcom.github.fommil.netlib.ARPACK=com.github.fommil.netlib.F2jARPACK") \
         .config("spark.rpc.message.maxSize", "256")
     if _HAS_RAPIDS and _GPU_ACCELERATION_ENABLED:
         builder = builder.config("spark.jars", _RAPIDS_JAR_URI)
@@ -163,3 +168,14 @@ CLASSIFIER_DISPLAY = {
     "naive_bayes": "朴素贝叶斯 (NB)",
 }
 SIMPLE_CLASSIFIERS = {"naive_bayes"}
+
+
+# ── Shared SparkSession reference ──
+_shared_spark_session = None
+
+def set_shared_spark(spark):
+    global _shared_spark_session
+    _shared_spark_session = spark
+
+def get_shared_spark():
+    return _shared_spark_session
