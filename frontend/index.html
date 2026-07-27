@@ -226,6 +226,30 @@
         .dq-dialog table th { background: #1a304a !important; color: #64ffda !important; }
         .dq-dialog table td { color: #e6f1ff !important; border-color: #233554 !important; }
         .dq-dialog table tr:nth-child(even) td { background: rgba(100,255,218,0.03); }
+
+        /* ===== 响应式布局 ===== */
+        .app-container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+        .app-header { max-width: 1400px; margin: 0 auto; padding: 0 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        .el-tabs__content { overflow-x: auto; }
+        .el-table { min-width: 600px; }
+        .el-table__body-wrapper { overflow-x: auto; }
+        .el-form { max-width: 100%; }
+        .el-form .el-input, .el-form .el-select { max-width: 100%; }
+        .chart-row { display: flex; flex-wrap: wrap; gap: 16px; }
+        .chart-card { flex: 1 1 400px; min-width: 300px; }
+        .chart-box { width: 100% !important; min-height: 350px; }
+        .el-dialog { max-width: 95vw; }
+        /* 小屏幕适配 */
+        @media (max-width: 768px) {
+            .app-header { flex-direction: column; gap: 10px; text-align: center; }
+            .chart-card { flex: 1 1 100%; min-width: 0; }
+            .el-dialog { width: 95% !important; }
+            .el-table { font-size: 12px; }
+        }
+        @media (max-width: 480px) {
+            .app-container, .app-header { padding: 0 10px; }
+            .el-button { padding: 8px 12px; font-size: 12px; }
+        }
     </style>
 </head>
 <body><!--CODEX_V4-->
@@ -291,7 +315,7 @@
                                         <el-select v-model="filterCategory" placeholder="按领域筛选" clearable style="width:180px;" @change="onFilterCategory">
                                             <el-option v-for="cat in sceneCategories" :key="cat" :label="cat" :value="cat"></el-option>
                                         </el-select>
-                                        <el-select v-model="selectedScene" placeholder="请选择场景" style="flex:1;">
+                                        <el-select v-model="selectedScene" placeholder="请选择场景" style="flex:1;" @change="dqPassed = false">
                                             <el-option v-for="sn in filteredAdminScenes" :key="sn.id" :label="sn.name + ' (' + sn.id + ')'" :value="sn.id"></el-option>
                                         </el-select>
                                     </div>
@@ -310,6 +334,7 @@
                                     <el-button type="primary" icon="el-icon-document-checked" @click="checkDataQuality" :loading="dqLoading" style="margin-right: 12px;">
                                         {{ dqLoading ? "质检中..." : "数据质检" }}
                                     </el-button>
+                                    <el-tag v-if="dqPassed" size="small" style="background:rgba(100,255,218,0.15);color:#64ffda;border-color:rgba(100,255,218,0.3);margin-right:12px;">✓ 已通过</el-tag>
                                     <el-button type="primary" :loading="loading" @click="startPredict" icon="el-icon-cpu">
                                         {{ loading ? loadingText : '开始智能分析' }}
                                     </el-button>
@@ -551,14 +576,6 @@
                                         </el-tag>
                                     </template>
                                 </el-table-column>
-                                <el-table-column label="训练状态" width="110">
-                                    <template slot-scope="scope">
-                                        <el-tag v-if="scope.row.training.status==='idle'" size="small" type="info">就绪</el-tag>
-                                        <el-tag v-else-if="scope.row.training.status==='running'" size="small" type="warning">训练中...</el-tag>
-                                        <el-tag v-else-if="scope.row.training.status==='completed'" size="small" type="success">已完成</el-tag>
-                                        <el-tag v-else size="small" type="danger">失败</el-tag>
-                                    </template>
-                                </el-table-column>
                                 <el-table-column label="操作" width="150" fixed="right">
                                     <template slot-scope="scope">
                                         <el-button type="text" size="small" icon="el-icon-edit" @click="openEditScene(scope.row)" style="color:#64ffda;">修改</el-button>
@@ -584,11 +601,19 @@
                                     </el-select>
                                 </div>
                                 <el-button type="primary" size="medium" @click="startTraining" :loading="trainingRunning" :disabled="trainingRunning" style="width:100%;margin-bottom:20px;" icon="el-icon-cpu">
-                                    {{ trainingRunning ? '训练中...' : '开始训练' }}
+                                    {{ trainingRunning ? '正在训练...' : '开始训练' }}
                                 </el-button>
+                                <div v-if="trainingRunning" style="margin-bottom:20px;background:#112240;padding:16px;border-radius:6px;">
+                                    <div style="color:#e6f1ff;margin-bottom:8px;font-size:14px;">
+                                        <i class="el-icon-loading" style="color:#64ffda;"></i> {{ trainingProgressText || '准备中...' }}
+                                    </div>
+                                    <el-progress :percentage="trainingProgress" :text-inside="true" :stroke-width="20" :color="'#64ffda'"></el-progress>
+                                </div>
                                 <div v-if="trainingResult" style="margin-top:15px;background:#112240;padding:16px;border-radius:6px;">
+                                    <div v-if="trainingResult.some(r=>r.status==='ok')" style="color:#64ffda;font-size:16px;font-weight:bold;margin-bottom:10px;">✅ 训练成功！</div>
+                                    <div v-else style="color:#ff6b6b;font-size:16px;font-weight:bold;margin-bottom:10px;">❌ 训练失败</div>
                                     <div v-for="(r,ai) in trainingResult" :key="ai" style="margin-bottom:6px;font-size:14px;">
-                                        <el-tag :type="r.status==='ok'?'success':'danger'" size="medium" style="margin-right:8px;">{{ r.algo }}</el-tag>
+                                        <span :style="{color: r.status==='ok' ? '#64ffda' : '#ff6b6b', fontWeight:'bold', marginRight:'8px'}">{{ r.algo }}</span>
                                         <span v-if="r.status==='ok'" style="color:#64ffda;">acc={{ (r.accuracy*100).toFixed(1) }}% f1={{ (r.f1*100).toFixed(1) }}%</span>
                                         <span v-else style="color:#ff6b6b;">{{ r.error }}</span>
                                     </div>
@@ -752,6 +777,8 @@
                     trainingPath: "",
                     trainingScene: "",
                     trainingRunning: false,
+                    trainingProgress: 0,
+                    trainingProgressText: '',
                     trainingResult: null,
                     uploadFile: null,
                     uploadFileName: "",
@@ -1120,14 +1147,30 @@ methods: {
                         let poll = () => {
                             axios.get("/api/admin/scenes/" + scene + "/training-status").then(r => {
                                 let s = r.data;
+                                if (s.status === "running") {
+                                    this.trainingProgress = s.progress || 0;
+                                    this.trainingProgressText = s.progress_text || '';
+                                }
                                 if (s.status === "completed") {
                                     this.trainingRunning = false;
+                                    this.trainingProgress = 0;
+                                    this.trainingProgressText = '';
                                     this.trainingResult = s.results || [{algo:"完成",status:"ok",accuracy:1,f1:1}];
+                                    this.trainingPath = '';
+                                    this.uploadFile = null;
+                                    this.uploadFileName = '';
+                                    if (this.$refs.datasetFileInput) this.$refs.datasetFileInput.value = '';
                                     this.fetchAdminScenes();
             this.fetchCategories();
                                 } else if (s.status === "failed") {
                                     this.trainingRunning = false;
+                                    this.trainingProgress = 0;
+                                    this.trainingProgressText = '';
                                     this.trainingResult = [{algo:"错误",status:"fail",error:s.error||"训练失败"}];
+                                    this.trainingPath = '';
+                                    this.uploadFile = null;
+                                    this.uploadFileName = '';
+                                    if (this.$refs.datasetFileInput) this.$refs.datasetFileInput.value = '';
                                 } else {
                                     setTimeout(poll, 2000);
                                 }

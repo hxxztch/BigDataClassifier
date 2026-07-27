@@ -37,7 +37,7 @@ try:
     def _on_progress(pct, text):
         _write_status("running", pct, progress_text=text)
 
-    _write_status("running", 10, progress_text="??????????...")
+    _write_status("running", 10, progress_text="正在启动训练进程...")
     train_sklearn(csv_path, scene_id, progress_callback=_on_progress)
 
     _write_status("running", 90, progress_text="????????...")
