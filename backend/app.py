@@ -12,7 +12,7 @@ from utils.logger import get_logger
 from utils.config import PROJECT_ROOT, set_shared_spark
 from utils.config import UPLOAD_DIR
 from admin_routes import admin_bp
-from utils.preprocessing import clean_column_names
+from utils.preprocessing import clean_column_names, custom_preprocessing
 from utils.data_quality import analyze_dataframe, compare_with_schema
 
 logger = get_logger(__name__)
@@ -31,17 +31,27 @@ def data_quality():
     try:
         df = classifier.spark.read.option("header", "true").option("inferSchema", "true").csv(file_path)
         df = clean_column_names(df)
+        df = df.fillna(0).fillna("Unknown")
+        df = custom_preprocessing(df, scene_type)
         schema_check = compare_with_schema(df, scene_type)
         dq_report = analyze_dataframe(df, scene_type)
         if "error" in dq_report:
             return jsonify({"error": dq_report["error"]}), 400
         cols_list = list(dq_report["columns"].values())
+        # Cache preprocessed data to speed up subsequent prediction
+        import hashlib
+        cache_key = hashlib.md5((file_path + scene_type).encode()).hexdigest()
+        cache_dir = os.path.join(PROJECT_ROOT, "data", "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = os.path.join(cache_dir, cache_key + ".parquet")
+        df.write.mode("overwrite").parquet(cache_path)
         return jsonify({
             "schema_check": schema_check,
             "total_rows": dq_report["total_rows"],
             "total_columns": dq_report["total_columns"],
             "columns": cols_list,
             "warnings": dq_report.get("warnings", []),
+            "cache_key": cache_key,
         })
     except Exception as e:
         logger.exception(f"Data quality check failed: {e}")
@@ -192,5 +202,4 @@ def predict_categories():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
-
 

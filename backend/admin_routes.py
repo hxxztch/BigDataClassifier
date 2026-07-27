@@ -282,14 +282,28 @@ def training_status_one(scene_id):
                 if s.get("status") in ("completed", "failed"):
                     try: proc.poll()
                     except: pass
-                    with _lock: del _training_tasks[scene_id]
+                    with _lock:
+                        if scene_id in _training_tasks:
+                            sf2 = _training_tasks[scene_id].pop("_status_file", None)
+                            del _training_tasks[scene_id]
+                        else:
+                            sf2 = None
+                    if sf2 and os.path.exists(sf2):
+                        os.remove(sf2)
             except: pass
         elif proc is not None:
             ret = proc.poll()
             if ret is not None:
                 s["status"] = "failed"
                 s["error"] = "Training process exited unexpectedly"
-                with _lock: del _training_tasks[scene_id]
+                with _lock:
+                    if scene_id in _training_tasks:
+                        sf2 = _training_tasks[scene_id].pop("_status_file", None)
+                        del _training_tasks[scene_id]
+                    else:
+                        sf2 = None
+                if sf2 and os.path.exists(sf2):
+                    os.remove(sf2)
         return jsonify(s)
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500

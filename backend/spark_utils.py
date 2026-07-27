@@ -224,11 +224,19 @@ class SparkClassifier:
                 task_id, current_model="None",
                 model_progress_status="Reading data / preprocessing..."
             )
-            df = self.spark.read.option("header", "true").option("inferSchema", "true").csv(file_path) if not file_path.endswith(".parquet") else self.spark.read.parquet(file_path)
-            df = clean_column_names(df)
-            df = validate_and_filter_columns(df, scene_type)
-            df = df.fillna(0).fillna("Unknown")
-            df = custom_preprocessing(df, scene_type)
+            # Try loading cached Parquet from data quality check
+            import hashlib, os as _os
+            cache_key = hashlib.md5((file_path + scene_type).encode()).hexdigest()
+            cache_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "cache", cache_key + ".parquet")
+            if _os.path.exists(cache_path):
+                df = self.spark.read.parquet(cache_path)
+                logger.info(f"Loaded from DQ cache: {cache_path}")
+            else:
+                df = self.spark.read.option("header", "true").option("inferSchema", "true").csv(file_path) if not file_path.endswith(".parquet") else self.spark.read.parquet(file_path)
+                df = clean_column_names(df)
+                df = validate_and_filter_columns(df, scene_type)
+                df = df.fillna(0).fillna("Unknown")
+                df = custom_preprocessing(df, scene_type)
             # Reload target_col from scenes.yaml (DATASET_META is cached at startup)
             target_col = DATASET_META.get(scene_type, "")
             if not target_col:

@@ -213,7 +213,19 @@
         .el-dialog .el-input__count { background: transparent !important; color: #8892b0 !important; }
 
         .dq-dialog { max-height: 85vh; }
-        .dq-dialog .el-message-box__content { max-height: 65vh; overflow-y: auto; }
+        .dq-dialog { background: #172a45 !important; border: 1px solid #233554 !important; }
+        .dq-dialog .el-message-box__header { padding: 20px 24px 10px; }
+        .dq-dialog .el-message-box__title { color: #64ffda !important; font-size: 18px; font-weight: bold; }
+        .dq-dialog .el-message-box__close { color: #8892b0 !important; }
+        .dq-dialog .el-message-box__close:hover { color: #ff6b6b !important; }
+        .dq-dialog .el-message-box__content { max-height: 65vh; overflow-y: auto; padding: 10px 24px 20px; color: #e6f1ff; }
+        .dq-dialog .el-message-box__btns { padding: 10px 24px 20px; }
+        .dq-dialog .el-message-box__btns .el-button--primary { background: #64ffda !important; border-color: #64ffda !important; color: #0b1a2f !important; font-weight: bold; }
+        .dq-dialog .el-message-box__btns .el-button--primary:hover { background: #00f2fe !important; border-color: #00f2fe !important; }
+        .dq-dialog table { background: #0b1a2f; }
+        .dq-dialog table th { background: #1a304a !important; color: #64ffda !important; }
+        .dq-dialog table td { color: #e6f1ff !important; border-color: #233554 !important; }
+        .dq-dialog table tr:nth-child(even) td { background: rgba(100,255,218,0.03); }
     </style>
 </head>
 <body><!--CODEX_V4-->
@@ -364,7 +376,7 @@
                             <div class="chart-card"><div id="pieChart" class="chart-box"></div></div>
                             <div class="chart-card" v-show="predictResult.confusion_matrix && predictResult.confusion_matrix.length > 0"><div id="heatmapChart" class="chart-box"></div></div>
                             <div class="chart-card" v-show="predictResult.confusion_matrix && predictResult.confusion_matrix.length > 0"><div id="barChart" class="chart-box"></div></div>
-                            <div class="chart-card" v-show="predictResult.feature_importance !== undefined"><div id="featureChart" class="chart-box"></div></div>
+                            <div class="chart-card" v-show="predictResult.feature_importance && predictResult.feature_importance.length > 0"><div id="featureChart" class="chart-box"></div></div>
                         </div>
 
                         <div style="margin-top: 30px; background: #172a45; padding: 20px;border-radius: 8px; border: 1px solid #233554;">
@@ -480,19 +492,19 @@
                                 <el-radio-button label="scenes">场景管理</el-radio-button>
                                 <el-radio-button label="training">模型训练</el-radio-button>
                             </el-radio-group>
-                            <el-dialog title="版本管理" :visible.sync="versionDialogVisible" width="500px">
+                            <el-dialog title="版本管理" :visible.sync="versionDialogVisible" width="500px" :close-on-click-modal="false">
+                                <div style="max-height:60vh;overflow-y:auto;">
                                 <el-table :data="versionList" size="small" stripe>
                                     <el-table-column prop="version" label="版本" width="60"></el-table-column>
                                     <el-table-column prop="trained_at" label="训练时间" width="170"></el-table-column>
-                                    <el-table-column label="状态" width="60">
-                                        <template slot-scope="vs"><el-tag v-if="vs.row.is_current" size="small" type="success">当前</el-tag></template>
-                                    </el-table-column>
-                                    <el-table-column label="操作" width="80">
+                                    <el-table-column label="操作" width="120">
                                         <template slot-scope="vs">
                                             <el-button v-if="!vs.row.is_current" type="primary" size="small" @click="activateVersion(vs.row.version)">启用</el-button>
+                                            <span v-else style="color:#64ffda;font-size:12px;">已启用</span>
                                         </template>
                                     </el-table-column>
                                 </el-table>
+                                </div>
                             </el-dialog>
                         </div>
                         <div v-show="adminSubTab==='scenes'">
@@ -513,10 +525,17 @@
                                 <el-table-column prop="id" label="ID" width="140"></el-table-column>
                                 <el-table-column prop="name" label="名称" width="150"></el-table-column>
                                 <el-table-column prop="target_col" label="目标列" width="130"></el-table-column>
-                                <el-table-column prop="category" label="分类" width="110"></el-table-column>
+                                <el-table-column label="分类" width="150">
+                                    <template slot-scope="scope">
+                                        <span>{{ scope.row.category || '-' }}</span>
+                                        <el-tooltip v-if="scope.row.category && !adminCategories.includes(scope.row.category)" content="该分类已被删除，请修改场景分类" placement="top">
+                                            <i class="el-icon-warning" style="color:#e6a23c;font-size:16px;margin-left:6px;cursor:help;"></i>
+                                        </el-tooltip>
+                                    </template>
+                                </el-table-column>
                                 <el-table-column label="描述" min-width="160" show-overflow-tooltip>
                                     <template slot-scope="scope">
-                                        <el-button type="text" size="small" @click="showDescDialog(scope.row)" :disabled="!scope.row.description">查看描述</el-button>
+                                        <el-button type="text" size="small" @click="showDescDialog(scope.row)">查看描述</el-button>
                                     </template>
                                 </el-table-column>
                                 <el-table-column label="版本" width="90" align="center">
@@ -582,29 +601,29 @@
             </el-tabs>
 
             <el-dialog 
-                title="📖 数据集格式使用说明" 
-                :visible.sync="showManual" 
+                title="📖 系统使用说明" 
+                :visible.sync="showManual" :close-on-click-modal="false" 
                 width="80%" 
                 top="5vh"
                 :append-to-body="true">
-                <div style="margin-bottom: 15px; color: #8892b0;">
-                    请确保上传的 CSV 文件包含以下<b>关键特征列</b>。
+                <div style="color:#e6f1ff;line-height:2;font-size:14px;">
+                    <h3 style="color:#64ffda;border-bottom:1px solid #233554;padding-bottom:8px;">功能标签说明</h3>
+                    <p><b style="color:#64ffda;">分类预测</b> — 上传 CSV 数据文件，选择业务场景和算法模型，执行数据质检和大数据分类预测，查看分析结果（准确率、混淆矩阵、特征重要性、饼图等）。</p>
+                    <p><b style="color:#64ffda;">历史记录</b> — 查看所有历史预测任务的记录，支持分页浏览和按状态筛选。</p>
+                    <p><b style="color:#64ffda;">系统管理</b> — 包含三个子标签：</p>
+                    <ul style="margin-left:20px;">
+                        <li><b>场景管理</b>：管理业务场景（添加/修改/删除），配置场景分类和描述，切换模型版本。</li>
+                        <li><b>模型训练</b>：选择 CSV 数据集和场景，训练四种模型，保存为最新版本。</li>
+                    </ul>
+                    <h3 style="color:#64ffda;border-bottom:1px solid #233554;padding-bottom:8px;margin-top:20px;">完整业务流程</h3>
+                    <div style="background:#112240;padding:16px;border-radius:6px;">
+                        <p><b>第一步：添加场景</b><br>进入「系统管理 → 场景管理」，点击「添加场景」，填写场景 ID、名称、目标列、分类。</p>
+                        <p><b>第二步：训练模型</b><br>进入「系统管理 → 模型训练」，选择 CSV 文件和场景，点击「开始训练」。系统自动训练随机森林、GBDT、XGBoost、朴素贝叶斯四种模型。</p>
+                        <p><b>第三步：切换版本</b><br>在场景管理的版本列点击「切换」，选择启用想要使用的模型版本，默认选择最新版本。</p>
+                        <p><b>第四步：数据预测</b><br>进入「分类预测」，上传待预测的 CSV，选择场景和模型（推荐用 Auto 自动择优），点击「数据质检」检查数据，质检通过后点击「开始智能分析」。</p>
+                        <p><b>第五步：查看结果</b><br>预测完成后自动展示准确率、混淆矩阵、特征重要性、预测分布饼图、Top 100 预测详情。历史任务可在「历史记录」中回溯。</p>
+                    </div>
                 </div>
-                <el-table :data="manualData" stripe height="600" class="manual-table">
-                    <el-table-column prop="category" label="领域" width="120" align="center"></el-table-column>
-                    <el-table-column prop="scene_name" label="业务场景" width="180" align="center">
-                        <template slot-scope="scope">
-                            <span style="font-weight: bold; color: #64ffda;">{{ scope.row.scene_name }}</span>
-                            <br><span style="font-size: 12px; color: #8892b0;">({{ scope.row.code }})</span>
-                        </template>
-                    </el-table-column>
-                    <el-table-column prop="target" label="Target" width="180">
-                        <template slot-scope="scope"><span class="required-col">{{ scope.row.target }}</span></template>
-                    </el-table-column>
-                    <el-table-column prop="features" label="Features">
-                        <template slot-scope="scope"><div style="font-size: 12px; color: #ccc;">{{ scope.row.features }}</div></template>
-                    </el-table-column>
-                </el-table>
                 <span slot="footer" class="dialog-footer">
                     <el-button type="primary" @click="showManual = false">我已知晓</el-button>
                 </span>
@@ -612,7 +631,7 @@
             >
 </el-dialog>
 <!-- Add Scene Dialog -->
-            <el-dialog title="添加场景" :visible.sync="showAddSceneDialog" width="500px" :append-to-body="true" @closed="addSceneForm = { scene_id: '', name: '', target_col: '', category: '' }">
+            <el-dialog title="添加场景" :visible.sync="showAddSceneDialog" width="500px" :append-to-body="true" :close-on-click-modal="false" @closed="addSceneForm = { scene_id: '', name: '', target_col: '', category: '' }">
                     <el-form label-width="80px" size="small">
                         <el-form-item label="场景ID"><el-input v-model="addSceneForm.scene_id" placeholder="英文ID, 如 shop_churn"></el-input></el-form-item>
                         <el-form-item label="场景名称"><el-input v-model="addSceneForm.name" placeholder="如: 用户流失预警"></el-input></el-form-item>
@@ -630,7 +649,7 @@
                     </div>
             </el-dialog>
             <!-- Edit Scene Dialog -->
-            <el-dialog title="修改场景" :visible.sync="editSceneDialog" width="550px" :append-to-body="true">
+            <el-dialog title="修改场景" :visible.sync="editSceneDialog" width="550px" :append-to-body="true" :close-on-click-modal="false">
                 <el-form label-width="80px" size="small">
                     <el-form-item label="场景ID"><el-input v-model="editSceneForm.scene_id" placeholder="场景ID"></el-input></el-form-item>
                     <el-form-item label="场景名称"><el-input v-model="editSceneForm.name" placeholder="场景名称"></el-input></el-form-item>
@@ -640,7 +659,7 @@
                             <el-option v-for="cat in adminCategories" :key="cat" :label="cat" :value="cat"></el-option>
                         </el-select>
                     </el-form-item>
-                    <el-form-item label="描述"><el-input v-model="editSceneForm.description" type="textarea" :rows="2"></el-input></el-form-item>
+                    <el-form-item label="描述"><el-input v-model="editSceneForm.description" type="textarea" :rows="2" maxlength="200" show-word-limit></el-input></el-form-item>
                 </el-form>
                 <span slot="footer">
                     <el-button @click="editSceneDialog = false">取消</el-button>
@@ -670,7 +689,7 @@
                     <el-button type="primary" @click="handleValidationErrorConfirm">确认并返回</el-button>
                 </span>
             </el-dialog>
-            <el-dialog title="场景描述" :visible.sync="descDialogVisible" width="500px" :append-to-body="true">
+            <el-dialog title="场景描述" :visible.sync="descDialogVisible" width="500px" :append-to-body="true" :close-on-click-modal="false">
                 <div style="min-height:80px;line-height:1.8;white-space:pre-wrap;color:#e6f1ff;">{{ descDialogContent }}</div>
                 <span slot="footer">
                     <el-button type="primary" @click="descDialogVisible = false">关闭</el-button>
@@ -745,6 +764,7 @@
                     trainAllLoading: false,
                     sceneDetailDialog: false,
                     dqLoading: false,
+                    dqPassed: false,
                     dqResult: null,
 
                     currentSceneDetail: null,
@@ -753,16 +773,6 @@
                         'trans_satisfaction': '乘客满意度', 'trans_delay': '航班延误预测', 'trans_accident': '交通事故定责',
                         'ind_failure': '设备故障诊断', 'ind_quality': '产品质量控制'
                     },
-                    manualData: [
-                        { category: '电商零售', scene_name: '用户流失预警', code: 'shop_churn', target: 'Churn', features: 'Tenure, PreferredLoginDevice, CityTier, WarehouseToHome, PreferredPaymentMode, Gender, HourSpendOnApp, NumberOfDeviceRegistered, PreferedOrderCat, SatisfactionScore, MaritalStatus, NumberOfAddress, Complain, OrderAmountHikeFromlastYear, CouponUsed, OrderCount, DaySinceLastOrder, CashbackAmount' },
-                        { category: '电商零售', scene_name: '交易欺诈检测', code: 'shop_fraud', target: 'Class', features: 'V1 - V28, Amount' },
-                        { category: '电商零售', scene_name: '用户下单预测', code: 'shop_order', target: 'ordered', features: 'basket_icon_click, basket_add_list, basket_add_detail, sort_by, image_picker, account_page_click, promo_banner_click, detail_wishlist_add, list_size_dropdown, closed_minibasket_click, checked_delivery_detail, checked_returns_detail, sign_in, saw_checkout, saw_sizecharts, saw_delivery, saw_account_upgrade, saw_homepage, device_mobile, device_computer, device_tablet, returning_user, loc_uk' },
-                        { category: '交通物流', scene_name: '乘客满意度', code: 'trans_satisfaction', target: 'satisfaction', features: 'Gender, Customer_Type, Age, Type_of_Travel, Class, Flight_Distance, Inflight_wifi_service, Departure/Arrival_time_convenient, Ease_of_Online_booking, Gate_location, Food_and_drink, Online_boarding, Seat_comfort, Inflight_entertainment, On-board_service, Leg_room_service, Baggage_handling, Checkin_service, Inflight_service, Cleanliness, Departure_Delay_in_Minutes, Arrival_Delay_in_Minutes' },
-                        { category: '交通物流', scene_name: '航班延误预测', code: 'trans_delay', target: 'DEP_DEL15', features: 'DAY_OF_MONTH, DAY_OF_WEEK, OP_UNIQUE_CARRIER, OP_CARRIER, ORIGIN_AIRPORT_ID, ORIGIN_AIRPORT_SEQ_ID, ORIGIN, DEST_AIRPORT_ID, DEST_AIRPORT_SEQ_ID, DEST, DEP_TIME, DEP_TIME_BLK, DISTANCE' },
-                        { category: '交通物流', scene_name: '交通事故定责', code: 'trans_accident', target: 'Severity', features: 'Source, Start_Lat, Start_Lng, End_Lat, End_Lng, Distance(mi), County, State, Timezone, Airport_Code, Weather_Timestamp, Temperature(F), Wind_Chill(F), Humidity(%), Pressure(in), Visibility(mi), Wind_Direction, Wind_Speed(mph), Precipitation(in), Weather_Condition, Amenity, Bump, Crossing, Give_Way, Junction, No_Exit, Railway, Roundabout, Station, Stop, Traffic_Calming, Traffic_Signal, Turning_Loop, Sunrise_Sunset, Civil_Twilight, Nautical_Twilight, Astronomical_Twilight' },
-                        { category: '工业制造', scene_name: '设备故障诊断', code: 'ind_failure', target: 'Machine_failure', features: 'Type, Air_temperature_[K], Process_temperature_[K], Rotational_speed_[rpm], Torque_[Nm], Tool_wear_[min]' },
-                        { category: '工业制造', scene_name: '产品质量控制', code: 'ind_quality', target: 'Quality (或 Pass/Fail)', features: '0 - 589' }
-                    ]
                 },
                 computed: {
                     sceneFilters() {
@@ -813,6 +823,13 @@ methods: {
                     },
                     
                     startPredict() {
+                        if (!this.dqPassed) {
+                            this.$message.warning('请先完成数据质检');
+                            return;
+                        }
+                        this._doStartPredict();
+                    },
+                    _doStartPredict() {
                         this.loading = true;
                         this.step = 2; 
                         this.analysisProgress = 0;
@@ -887,7 +904,7 @@ methods: {
                         axios.get(`http://localhost:5000/task/${row.task_id}`).then(res => {
                             loading.close();
                             if (res.data.status === 'completed' && res.data.result) {
-                                this.selectedScene = row.scene_type;
+                                this.selectedScene = row.scene_type; this.dqPassed = false;
                                 this.modelType = row.model_type;
                                 this.currentFileName = this.getFileName(row.file_path);
                                 this.currentFinishTime = row.finish_time;
@@ -907,7 +924,7 @@ methods: {
                     reset() {
                         this.step = 0;
                         this.predictResult = { accuracy: 0, chart_data: [], distribution: [], final_model: '' };
-                        this.currentFilePath = '';
+                        this.currentFilePath = ''; this.dqPassed = false;
                         this.currentFinishTime = '';
                         this.analysisProgress = 0;
                         this.uploadPercentage = 0;
@@ -973,12 +990,17 @@ methods: {
                                     ]
                                 });
                             }
-                            if (this.predictResult.feature_importance && this.predictResult.feature_importance.length > 0) {
-                                const chart = echarts.init(document.getElementById('featureChart'));
-                                const data = [...this.predictResult.feature_importance].reverse();
+                            if (this.predictResult.feature_importance) {
+                                const el = document.getElementById('featureChart');
+                                if (!el) return;
+                                const inst = echarts.getInstanceByDom(el);
+                                if (inst) inst.dispose();
+                                const chart = echarts.init(el);
+                                const raw = this.predictResult.feature_importance || [];
+                                const data = raw.length > 0 ? [...raw].reverse() : [{ name: '该模型无特征重要性', value: 0 }];
                                 chart.setOption({
                                     ...commonOption,
-                                    title: { text: '特征重要性', left: 'center', textStyle: { color: '#e6f1ff' } },
+                                    title: { text: raw.length > 0 ? '特征重要性' : '特征重要性 (NB 模型不支持)', left: 'center', textStyle: { color: '#e6f1ff' } },
                                     grid: { left: '3%', right: '10%', bottom: '3%', containLabel: true },
                                     xAxis: { type: 'value', axisLabel: { color: '#e6f1ff' }, splitLine: { lineStyle: { color: '#233554' } } },
                                     yAxis: { type: 'category', data: data.map(i => i.name), axisLabel: { color: '#e6f1ff' } },
@@ -998,11 +1020,12 @@ methods: {
                         }).then(res => {
                             _this.dqResult = res.data;
                             _this.dqLoading = false;
+                            _this.dqPassed = !!(res.data.schema_check && res.data.schema_check.match);
                             _this.$alert(_this.formatDQReport(res.data), "数据质检报告", {
                                 dangerouslyUseHTMLString: true,
                                 width: "900px",
                                 customClass: "dq-dialog",
-                                closeOnClickModal: false
+                                closeOnClickModal: false,
                             });
                         }).catch(err => {
                             _this.dqLoading = false;
@@ -1041,7 +1064,7 @@ methods: {
                     reset() {
                         this.step = 0;
                         this.predictResult = { accuracy: 0, chart_data: [], distribution: [], final_model: '' };
-                        this.currentFilePath = '';
+                        this.currentFilePath = ''; this.dqPassed = false;
                         this.currentFinishTime = '';
                         this.analysisProgress = 0;
                         this.uploadPercentage = 0;
