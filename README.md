@@ -37,22 +37,33 @@ Spark 大数据快速分类系统是一个基于 PySpark 分布式计算框架�
 
 ## 技术栈
 
-**后端**
-![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)
-![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask)
-![Spark](https://img.shields.io/badge/Spark-3.x-orange?logo=apachespark)
-![Scikit--learn](https://img.shields.io/badge/Scikit--learn-1.x-yellow?logo=scikitlearn)
-![XGBoost](https://img.shields.io/badge/XGBoost-1.x-red)
+### 前端
 
-**前端**
-![Vue.js](https://img.shields.io/badge/Vue.js-2.x-brightgreen?logo=vuedotjs)
-![Element UI](https://img.shields.io/badge/Element%20UI-2.x-409EFF?logo=element)
-![ECharts](https://img.shields.io/badge/ECharts-5.x-AA344D)
+| 技术 | 用途 |
+|------|------|
+| Vue.js 2 | 前端框架 |
+| Element UI | UI 组件库 |
+| ECharts 5 | 数据可视化 |
+| Axios | HTTP 请求 |
 
-**数据与工具**
-![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite)
-![YAML](https://img.shields.io/badge/YAML-配置管理-CB171E)
-![Parquet](https://img.shields.io/badge/Parquet-缓存加速-50AF95)
+### 后端
+
+| 技术 | 用途 |
+|------|------|
+| Python 3.10 | 开发语言 |
+| Flask 2.x | Web 框架 |
+| PySpark 3.x | 分布式计算引擎 |
+| Scikit-learn 1.x | 机器学习 |
+| XGBoost 1.x | 梯度提升模型 |
+
+### 数据与存储
+
+| 技术 | 用途 |
+|------|------|
+| SQLite | 任务记录存储 |
+| YAML | 场景配置管理 |
+| Parquet | 数据缓存加速 |
+| Java JDK 21 | Spark 运行环境 |
 
 ## 项目结构
 
