@@ -95,6 +95,14 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
         def _safe_feat(v):
             if hasattr(v, 'toArray'):
                 return v.toArray()
+            if isinstance(v, dict):
+                if 'values' in v:
+                    if v.get('type') == 1:
+                        arr = np.zeros(v.get('size', 0))
+                        arr[v['indices']] = v['values']
+                        return arr
+                    return np.asarray(v['values'], dtype=np.float64)
+                return np.zeros(0)
             if isinstance(v, str):
                 import re
                 m = re.match(r'\((\d+),\s*\[(.*?)\],\s*\[(.*?)\]\)', v)
@@ -208,6 +216,17 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
 
         _reg_ver(MODELS_DIR, task_name, _train_ver, results, dataset=task_name + ".csv", rows=row_count)
         logger.info(f"  Registered version {_train_ver} ({len(results)} models)")
+
+        # Automatically update required_cols in scenes.yaml from training data
+        _scenes_yaml = os.path.join(BACKEND, "scenes.yaml")
+        if os.path.isfile(_scenes_yaml) and feature_cols:
+            import yaml as _yaml
+            with open(_scenes_yaml, "r", encoding="utf-8") as _f:
+                _sc = _yaml.safe_load(_f) or {}
+            _sc.setdefault("scenes", {}).setdefault(task_name, {})["required_cols"] = feature_cols
+            with open(_scenes_yaml, "w", encoding="utf-8") as _f:
+                _yaml.dump(_sc, _f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            logger.info(f"  Updated required_cols in scenes.yaml ({len(feature_cols)} columns)")
 
     finally:
         pass  # Spark already stopped before training

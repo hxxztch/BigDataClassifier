@@ -40,7 +40,27 @@ def analyze_dataframe(df, scene_type):
 def compare_with_schema(df, scene_type):
     required = SCENE_REQUIRED_COLS.get(scene_type, [])
     if not required:
-        return {"match": True, "message": "No schema defined for this scene"}
+        # Reload from scenes.yaml for newly added scenes (module cache is stale)
+        import yaml, os
+        sy = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scenes.yaml')
+        if os.path.isfile(sy):
+            with open(sy, 'r', encoding='utf-8') as f:
+                sc = yaml.safe_load(f) or {}
+            required = (sc.get('scenes', {}).get(scene_type, {}) or {}).get('required_cols', [])
+    if not required:
+        # No required_cols defined — at minimum check the target column exists
+        target_col = ""
+        import yaml, os
+        sy = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scenes.yaml')
+        if os.path.isfile(sy):
+            with open(sy, 'r', encoding='utf-8') as f:
+                sc = yaml.safe_load(f) or {}
+            target_col = (sc.get('scenes', {}).get(scene_type, {}) or {}).get('target_col', '')
+        if target_col and target_col not in df.columns:
+            return {"match": False, "required_cols": 0, "actual_cols": len(df.columns),
+                    "missing_cols": [target_col], "extra_cols": [], "missing_count": 1, "extra_count": 0,
+                    "message": "Target column not found: %s" % target_col}
+        return {"match": True, "message": "通过 (仅校验目标列，未定义必含列)"}
     actual_cols = set(df.columns)
     required_set = set(required)
     missing = required_set - actual_cols

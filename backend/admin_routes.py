@@ -77,6 +77,7 @@ def _train_subprocess(scene_id, csv_path):
 def list_scenes():
     data = _load_yaml()
     scenes = data.get("scenes", {})
+    categories = data.get("categories", [])
     result = []
     for sid, s in sorted(scenes.items()):
         entry = dict(s); entry["id"] = sid
@@ -84,7 +85,38 @@ def list_scenes():
         entry["current_version"] = _load_reg(_MODELS_DIR).get(sid, {}).get("current_version", 1)
         with _lock: entry["training"] = _training_tasks.get(sid, {"status": "idle"})
         result.append(entry)
-    return jsonify(result)
+    return jsonify({"scenes": result, "categories": categories})
+
+
+@admin_bp.route("/api/admin/categories", methods=["GET"])
+def list_categories():
+    data = _load_yaml()
+    return jsonify(data.get("categories", []))
+
+
+@admin_bp.route("/api/admin/categories", methods=["POST"])
+def add_category():
+    name = (request.get_json() or {}).get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Category name required"}), 400
+    data = _load_yaml()
+    cats = data.setdefault("categories", [])
+    if name not in cats:
+        cats.append(name)
+        _save_yaml(data)
+    return jsonify({"ok": True, "categories": cats})
+
+
+@admin_bp.route("/api/admin/categories/<name>", methods=["DELETE"])
+def delete_category(name):
+    data = _load_yaml()
+    cats = data.get("categories", [])
+    if name in cats:
+        cats.remove(name)
+        _save_yaml(data)
+    return jsonify({"ok": True, "categories": cats})
+
+
 @admin_bp.route("/api/admin/scenes/analyze", methods=["POST"])
 def analyze_csv():
     if "file" not in request.files:
@@ -161,6 +193,40 @@ def remove_scene(scene_id):
     if scene_id not in sd.get("scenes", {}):
         return jsonify({"error": "Not found"}), 404
     del sd["scenes"][scene_id]
+    _save_yaml(sd)
+    # Clean up model files
+    import shutil
+    for root, dirs, _ in os.walk(_MODELS_DIR):
+        for d in dirs:
+            if d.startswith(scene_id + "_"):
+                shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+    # Clean up version registry
+    reg = _load_reg(_MODELS_DIR)
+    if scene_id in reg:
+        del reg[scene_id]
+        from utils.version_manager import save as _save_reg
+        _save_reg(_MODELS_DIR, reg)
+    return jsonify({"ok": True})
+
+
+@admin_bp.route("/api/admin/scenes/<scene_id>", methods=["PUT"])
+def edit_scene(scene_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data"}), 400
+    sd = _load_yaml()
+    if scene_id not in sd.get("scenes", {}):
+        return jsonify({"error": "Not found"}), 404
+    scene = sd["scenes"][scene_id]
+    if "name" in data: scene["name"] = data["name"]
+    if "target_col" in data: scene["target_col"] = data["target_col"]
+    if "category" in data: scene["category"] = data["category"]
+    if "description" in data: scene["description"] = data["description"]
+    if "required_cols" in data: scene["required_cols"] = data["required_cols"]
+    # Allow renaming scene_id via a new_id field
+    if "new_id" in data and data["new_id"] and data["new_id"] != scene_id:
+        sd["scenes"][data["new_id"]] = scene
+        del sd["scenes"][scene_id]
     _save_yaml(sd)
     return jsonify({"ok": True})
 
@@ -270,5 +336,3 @@ def upload_dataset():
     save_path = os.path.join(target_dir, secure_filename(f.filename))
     f.save(save_path)
     return jsonify({"ok": True, "path": save_path, "name": f.filename})
-
-

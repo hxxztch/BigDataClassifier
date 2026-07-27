@@ -1,4 +1,4 @@
-﻿from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import traceback
@@ -172,9 +172,25 @@ def health():
 @app.route("/history", methods=["GET"])
 def history():
     scene_type = request.args.get("scene_type")
+    page = request.args.get("page", 1, type=int)
+    page_size = request.args.get("page_size", 50, type=int)
     tasks = get_history(scene_type)
-    return jsonify(tasks)
+    total = len(tasks)
+    start = (page - 1) * page_size
+    paged = tasks[start:start + page_size]
+    return jsonify({"tasks": paged, "total": total, "page": page, "page_size": page_size})
+
+@app.route('/api/predict/categories', methods=['GET'])
+def predict_categories():
+    import yaml, os
+    sy = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scenes.yaml')
+    if os.path.isfile(sy):
+        with open(sy, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+        return jsonify(data.get('categories', []))
+    return jsonify([])
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+
 

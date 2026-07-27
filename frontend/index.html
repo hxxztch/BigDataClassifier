@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -207,6 +207,13 @@
         .el-radio-button__inner:hover {
             color: #64ffda !important;
         }
+
+        .el-dialog .el-textarea__inner { background-color: #0b1a2f !important; border: 1px solid #8892b0 !important; color: #e6f1ff !important; }
+        .el-dialog .el-textarea__inner:focus { border-color: #64ffda !important; }
+        .el-dialog .el-input__count { background: transparent !important; color: #8892b0 !important; }
+
+        .dq-dialog { max-height: 85vh; }
+        .dq-dialog .el-message-box__content { max-height: 65vh; overflow-y: auto; }
     </style>
 </head>
 <body><!--CODEX_V4-->
@@ -268,22 +275,14 @@
                             
                             <el-form label-position="top" size="medium" style="text-align: left;">
                                 <el-form-item label="1. 请选择业务应用场景">
-                                    <el-select v-model="selectedScene" placeholder="请选择场景" style="width: 100%;">
-                                        <el-option-group label="电商零售">
-                                            <el-option label="用户流失预警 (Churn)" value="shop_churn"></el-option>
-                                            <el-option label="交易欺诈检测 (Fraud)" value="shop_fraud"></el-option>
-                                            <el-option label="用户购买意向 (Order)" value="shop_order"></el-option>
-                                        </el-option-group>
-                                        <el-option-group label="交通物流">
-                                            <el-option label="乘客满意度 (Satisfaction)" value="trans_satisfaction"></el-option>
-                                            <el-option label="航班延误预测 (Delay)" value="trans_delay"></el-option>
-                                            <el-option label="交通事故定责 (Accident)" value="trans_accident"></el-option>
-                                        </el-option-group>
-                                        <el-option-group label="工业制造">
-                                            <el-option label="设备故障诊断 (Failure)" value="ind_failure"></el-option>
-                                            <el-option label="产品质量控制 (Quality)" value="ind_quality"></el-option>
-                                        </el-option-group>
-                                    </el-select>
+                                    <div style="display:flex;gap:10px;">
+                                        <el-select v-model="filterCategory" placeholder="按领域筛选" clearable style="width:180px;" @change="onFilterCategory">
+                                            <el-option v-for="cat in sceneCategories" :key="cat" :label="cat" :value="cat"></el-option>
+                                        </el-select>
+                                        <el-select v-model="selectedScene" placeholder="请选择场景" style="flex:1;">
+                                            <el-option v-for="sn in filteredAdminScenes" :key="sn.id" :label="sn.name + ' (' + sn.id + ')'" :value="sn.id"></el-option>
+                                        </el-select>
+                                    </div>
                                 </el-form-item>
                                 <el-form-item label="2. 请选择算法模型">
                                     <el-select v-model="modelType" placeholder="选择算法模型" style="width: 100%;">
@@ -365,7 +364,7 @@
                             <div class="chart-card"><div id="pieChart" class="chart-box"></div></div>
                             <div class="chart-card" v-show="predictResult.confusion_matrix && predictResult.confusion_matrix.length > 0"><div id="heatmapChart" class="chart-box"></div></div>
                             <div class="chart-card" v-show="predictResult.confusion_matrix && predictResult.confusion_matrix.length > 0"><div id="barChart" class="chart-box"></div></div>
-                            <div class="chart-card" v-show="predictResult.feature_importance && predictResult.feature_importance.length > 0"><div id="featureChart" class="chart-box"></div></div>
+                            <div class="chart-card" v-show="predictResult.feature_importance !== undefined"><div id="featureChart" class="chart-box"></div></div>
                         </div>
 
                         <div style="margin-top: 30px; background: #172a45; padding: 20px;border-radius: 8px; border: 1px solid #233554;">
@@ -461,6 +460,15 @@
                                 </template>
                             </el-table-column>
                         </el-table>
+                        <el-pagination
+                            style="margin-top:20px;text-align:right;"
+                            background
+                            layout="total, prev, pager, next"
+                            :page-size="historyPageSize"
+                            :total="historyTotal"
+                            :current-page.sync="historyPage"
+                            @current-change="fetchHistory">
+                        </el-pagination>
                     </div>
 
                 </el-tab-pane>
@@ -490,6 +498,12 @@
                         <div v-show="adminSubTab==='scenes'">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                                 <h3 style="margin:0;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">场景管理</h3>
+                            <div style="margin-bottom:16px;padding:10px 14px;background:rgba(100,255,218,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                <span style="color:#8892b0;font-size:13px;">分类管理:</span>
+                                <el-tag v-for="cat in adminCategories" :key="cat" closable size="small" @close="deleteCategory(cat)">{{ cat }}</el-tag>
+                                <el-input v-model="newCategoryName" size="mini" placeholder="新分类名" style="width:110px;" @keyup.enter.native="addCategory"></el-input>
+                                <el-button type="primary" size="mini" icon="el-icon-plus" @click="addCategory" :disabled="!newCategoryName.trim()">添加</el-button>
+                            </div>
                                 <div>
                                     <el-button type="primary" icon="el-icon-plus" @click="showAddSceneDialog = true" style="margin-right:10px;">添加场景</el-button>
                                     <el-button type="primary" icon="el-icon-refresh" @click="fetchAdminScenes">刷新</el-button>
@@ -499,6 +513,12 @@
                                 <el-table-column prop="id" label="ID" width="140"></el-table-column>
                                 <el-table-column prop="name" label="名称" width="150"></el-table-column>
                                 <el-table-column prop="target_col" label="目标列" width="130"></el-table-column>
+                                <el-table-column prop="category" label="分类" width="110"></el-table-column>
+                                <el-table-column label="描述" min-width="160" show-overflow-tooltip>
+                                    <template slot-scope="scope">
+                                        <el-button type="text" size="small" @click="showDescDialog(scope.row)" :disabled="!scope.row.description">查看描述</el-button>
+                                    </template>
+                                </el-table-column>
                                 <el-table-column label="版本" width="90" align="center">
                                     <template slot-scope="scope">
                                         <el-tag size="small">{{ scope.row.current_version || 1 }}</el-tag>
@@ -522,7 +542,7 @@
                                 </el-table-column>
                                 <el-table-column label="操作" width="150" fixed="right">
                                     <template slot-scope="scope">
-                                        <el-button type="text" size="small" icon="el-icon-info" @click="showSceneDetail(scope.row)" style="color:#64ffda;">详情</el-button>
+                                        <el-button type="text" size="small" icon="el-icon-edit" @click="openEditScene(scope.row)" style="color:#64ffda;">修改</el-button>
                                         <el-button type="text" size="small" icon="el-icon-delete" @click="deleteScene(scope.row.id)" style="color:#ff6b6b;">删除</el-button>
                                     </template>
                                 </el-table-column>
@@ -588,6 +608,44 @@
                 <span slot="footer" class="dialog-footer">
                     <el-button type="primary" @click="showManual = false">我已知晓</el-button>
                 </span>
+            
+            >
+</el-dialog>
+<!-- Add Scene Dialog -->
+            <el-dialog title="添加场景" :visible.sync="showAddSceneDialog" width="500px" :append-to-body="true" @closed="addSceneForm = { scene_id: '', name: '', target_col: '', category: '' }">
+                    <el-form label-width="80px" size="small">
+                        <el-form-item label="场景ID"><el-input v-model="addSceneForm.scene_id" placeholder="英文ID, 如 shop_churn"></el-input></el-form-item>
+                        <el-form-item label="场景名称"><el-input v-model="addSceneForm.name" placeholder="如: 用户流失预警"></el-input></el-form-item>
+                        <el-form-item label="目标列"><el-input v-model="addSceneForm.target_col" placeholder="CSV中作为标签的列名"></el-input></el-form-item>
+                        <el-form-item label="场景分类">
+                            <el-select v-model="addSceneForm.category" style="width:100%" placeholder="选择分类">
+                                <el-option v-for="cat in adminCategories" :key="cat" :label="cat" :value="cat"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="描述"><el-input v-model="addSceneForm.description" type="textarea" :rows="2" maxlength="200" show-word-limit></el-input></el-form-item>
+                    </el-form>
+                    <div style="margin-top:15px;text-align:right;">
+                        <el-button @click="showAddSceneDialog = false">取消</el-button>
+                        <el-button type="primary" @click="submitAddScene">提交</el-button>
+                    </div>
+            </el-dialog>
+            <!-- Edit Scene Dialog -->
+            <el-dialog title="修改场景" :visible.sync="editSceneDialog" width="550px" :append-to-body="true">
+                <el-form label-width="80px" size="small">
+                    <el-form-item label="场景ID"><el-input v-model="editSceneForm.scene_id" placeholder="场景ID"></el-input></el-form-item>
+                    <el-form-item label="场景名称"><el-input v-model="editSceneForm.name" placeholder="场景名称"></el-input></el-form-item>
+                    <el-form-item label="目标列"><el-input v-model="editSceneForm.target_col" placeholder="目标列"></el-input></el-form-item>
+                    <el-form-item label="场景分类">
+                        <el-select v-model="editSceneForm.category" style="width:100%" placeholder="选择分类">
+                            <el-option v-for="cat in adminCategories" :key="cat" :label="cat" :value="cat"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="描述"><el-input v-model="editSceneForm.description" type="textarea" :rows="2"></el-input></el-form-item>
+                </el-form>
+                <span slot="footer">
+                    <el-button @click="editSceneDialog = false">取消</el-button>
+                    <el-button type="primary" @click="submitEditScene">保存</el-button>
+                </span>
             </el-dialog>
             
             <el-dialog 
@@ -610,6 +668,12 @@
                 <span slot="footer" class="dialog-footer">
                     <el-button @click="showManual = true">查看手册</el-button>
                     <el-button type="primary" @click="handleValidationErrorConfirm">确认并返回</el-button>
+                </span>
+            </el-dialog>
+            <el-dialog title="场景描述" :visible.sync="descDialogVisible" width="500px" :append-to-body="true">
+                <div style="min-height:80px;line-height:1.8;white-space:pre-wrap;color:#e6f1ff;">{{ descDialogContent }}</div>
+                <span slot="footer">
+                    <el-button type="primary" @click="descDialogVisible = false">关闭</el-button>
                 </span>
             </el-dialog>
         </div><!--closes .container-->
@@ -637,9 +701,14 @@
                     currentFileName: '',
                     currentFinishTime: '',
                     selectedScene: 'ind_quality',
+                    sceneCategories: [],
+                    filterCategory: '',
                     modelType: 'auto',
                     predictResult: { accuracy: 0, chart_data: [], distribution: [], final_model: '' },
                     historyData: [],
+                    historyPage: 1,
+                    historyTotal: 0,
+                    historyPageSize: 50,
                     currentTaskId: null,
                     currentModelName: 'None',
                     currentModelProgressStatus: '等待开始',
@@ -652,6 +721,15 @@
                     analyzeResult: null,
                     addSceneConfig: {},
                     adminSceneList: [],
+                    adminCategories: [],
+                    addSceneForm: { scene_id: '', name: '', target_col: '', category: '' },
+                    editSceneForm: { scene_id: '', name: '', target_col: '', category: '', original_id: '' },
+                    editSceneDialog: false,
+                    descDialogVisible: false,
+                    descDialogContent: '',
+                    addSceneFile: null,
+                    addSceneAnalyzed: null,
+                    newCategoryName: '',
                     trainingPath: "",
                     trainingScene: "",
                     trainingRunning: false,
@@ -691,7 +769,13 @@
                         return Object.entries(this.sceneMap).map(([key, value]) => ({ text: value, value: key }));
                     }
                 },
-                methods: {
+                computed: {
+filteredAdminScenes() {
+    if (!this.filterCategory) return this.adminSceneList;
+    return this.adminSceneList.filter(s => s.category === this.filterCategory);
+},
+},
+methods: {
                     getSceneName(key) { return this.sceneMap[key] || key; },
                     getAlgoName(key) {
                         const map = { 'random_forest': '随机森林 (RF)', 'gbdt': '梯度提升树 (GBDT)', 'naive_bayes': '朴素贝叶斯 (NB)', 'auto': '自动择优 (Auto)', 'None': '系统处理中' };
@@ -818,7 +902,7 @@
                     },
 
                     fetchHistory() {
-                        axios.get('http://localhost:5000/history').then(res => { this.historyData = res.data; });
+                        axios.get('http://localhost:5000/history', { params: { page: this.historyPage, page_size: this.historyPageSize } }).then(res => { this.historyData = res.data.tasks; this.historyTotal = res.data.total; });
                     },
                     reset() {
                         this.step = 0;
@@ -916,7 +1000,9 @@
                             _this.dqLoading = false;
                             _this.$alert(_this.formatDQReport(res.data), "数据质检报告", {
                                 dangerouslyUseHTMLString: true,
-                                width: "700px"
+                                width: "900px",
+                                customClass: "dq-dialog",
+                                closeOnClickModal: false
                             });
                         }).catch(err => {
                             _this.dqLoading = false;
@@ -936,6 +1022,7 @@
                             html += "</ul>";
                         }
                         html += "<p><b>列详情:</b></p><table style='width:100%;border-collapse:collapse;font-size:12px'>";
+                        html = html.replace("<p><b>列详情:</b></p>", "<p><b>列详情 (" + (Object.keys(data.columns||{}).length) + " 列):</b></p><div style='max-height:50vh;overflow-y:auto;border:1px solid #233554;'><table style='width:100%;border-collapse:collapse;font-size:12px'>");
                         html += "<tr style='background:#1a304a'><th style='padding:4px;border:1px solid #233554'>列名</th><th style='padding:4px;border:1px solid #233554'>类型</th><th style='padding:4px;border:1px solid #233554'>缺失率</th><th style='padding:4px;border:1px solid #233554'>范围</th></tr>";
                         if (data.columns) {
                             for (const k in data.columns) {
@@ -944,12 +1031,12 @@
                                 html += "<tr><td style='padding:4px;border:1px solid #233554'>" + c.name + "</td><td style='padding:4px;border:1px solid #233554'>" + c.type + "</td><td style='padding:4px;border:1px solid #233554'>" + c.null_pct + "%</td><td style='padding:4px;border:1px solid #233554'>" + rng + "</td></tr>";
                             }
                         }
-                        html += "</table></div>";
+                        html += "</table></div></div>";
                         return html;
                     },
                     
                     fetchHistory() {
-                        axios.get('http://localhost:5000/history').then(res => { this.historyData = res.data; });
+                        axios.get('http://localhost:5000/history', { params: { page: this.historyPage, page_size: this.historyPageSize } }).then(res => { this.historyData = res.data.tasks; this.historyTotal = res.data.total; });
                     },
                     reset() {
                         this.step = 0;
@@ -959,8 +1046,9 @@
                         this.analysisProgress = 0;
                         this.uploadPercentage = 0;
                     },
+                    fetchCategories() { axios.get('/api/predict/categories').then(res => { this.sceneCategories = res.data; }); },
                     fetchAdminScenes() {
-                        axios.get('/api/admin/scenes').then(res => { this.adminSceneList = res.data; });
+                        axios.get('/api/admin/scenes').then(res => { this.adminSceneList = res.data.scenes; this.adminCategories = res.data.categories; });
                     },
                     showVersionDlg(row) {
                         this.currentVersionScene = row.id;
@@ -974,6 +1062,7 @@
                             this.$message.success('版本切换成功');
                             this.versionDialogVisible = false;
                             this.fetchAdminScenes();
+            this.fetchCategories();
                         });
                     }
                     ,
@@ -1012,6 +1101,7 @@
                                     this.trainingRunning = false;
                                     this.trainingResult = s.results || [{algo:"完成",status:"ok",accuracy:1,f1:1}];
                                     this.fetchAdminScenes();
+            this.fetchCategories();
                                 } else if (s.status === "failed") {
                                     this.trainingRunning = false;
                                     this.trainingResult = [{algo:"错误",status:"fail",error:s.error||"训练失败"}];
@@ -1033,20 +1123,88 @@
                         if (confirm('确认删除 '+sceneId+'?')) {
                             axios.delete('/api/admin/scenes/'+sceneId).then(r => {
                                 this.fetchAdminScenes();
+            this.fetchCategories();
                             });
                         }
                     },
-                    showSceneDetail(row) {
-                        this.currentSceneDetail = row;
-                        this.sceneDetailDialog = true;
+                    openEditScene(row) {
+                        this.editSceneForm = { scene_id: row.id, name: row.name, target_col: row.target_col, category: row.category || '', required_cols: (row.required_cols||[]).join(','), description: row.description || '' };
+                        this.editSceneDialog = true;
+                    },
+                    submitEditScene() {
+                        let f = this.editSceneForm;
+                        if (!f.scene_id || !f.name || !f.target_col || !f.category) {
+                            this.$message.error('请填写完整信息');
+                            return;
+                        }
+                        axios.put('/api/admin/scenes/' + encodeURIComponent(f.original_id || f.scene_id), {
+                            name: f.name, target_col: f.target_col, category: f.category,
+                            description: f.description, new_id: f.scene_id
+                        }).then(res => {
+                            this.$message.success('修改成功');
+                            this.editSceneDialog = false;
+                            this.fetchAdminScenes();
+                        }).catch(e => { this.$message.error(e.response?.data?.error || '修改失败'); });
                     },
                     trainAllScenes() {
                         alert('全部训练已启动');
+                    },
+                    addCategory() {
+                        if (!this.newCategoryName.trim()) return;
+                        axios.post('/api/admin/categories', { name: this.newCategoryName.trim() }).then(res => {
+                            this.adminCategories = res.data.categories;
+                            this.sceneCategories = res.data.categories;
+                            this.newCategoryName = '';
+                            this.$message.success('分类已添加');
+                        });
+                    },
+                    deleteCategory(name) {
+                        this.$confirm('删除分类不会删除已有场景，确定?', '提示', { type: 'warning' }).then(() => {
+                            axios.delete('/api/admin/categories/' + encodeURIComponent(name)).then(res => {
+                                this.adminCategories = res.data.categories;
+                                this.sceneCategories = res.data.categories;
+                                this.$message.success('已删除');
+                            });
+                        }).catch(() => {});
+                    },
+                    handleAddSceneFile(file) {
+                        this.addSceneFile = file.raw;
+                    },
+                    analyzeAddSceneFile() {
+                        if (!this.addSceneFile) return;
+                        let fd = new FormData();
+                        fd.append('file', this.addSceneFile);
+                        axios.post('/api/admin/scenes/analyze', fd).then(res => {
+                            this.addSceneAnalyzed = res.data;
+                            this.addSceneForm.target_col = res.data.target_guess || '';
+                            this.addSceneStep = 2;
+                        }).catch(e => { this.$message.error(e.response?.data?.error || '分析失败'); });
+                    },
+                    submitAddScene() {
+                        let f = this.addSceneForm;
+                        if (!f.scene_id || !f.target_col || !f.category) {
+                            this.$message.error('请填写场景ID、目标列和分类');
+                            return;
+                        }
+                        let payload = { scene_id: f.scene_id, name: f.name || f.scene_id, target_col: f.target_col, category: f.category, description: f.description || '', label_map: {} };
+                        axios.post('/api/admin/scenes/add', payload).then(res => {
+                            this.$message.success('场景添加成功');
+                            this.showAddSceneDialog = false;
+                            this.addSceneForm = { scene_id: '', name: '', target_col: '', category: '' };
+                            this.addSceneForm.required_cols = '';
+                            this.fetchAdminScenes();
+                        }).catch(e => { this.$message.error(e.response?.data?.error || '添加失败'); });
+                    },
+                    onFilterCategory() {},
+                    showDescDialog(row) {
+                        this.descDialogContent = row.description || '暂无描述';
+                        this.descDialogVisible = true;
                     },
                 },
                 mounted() {
                     this.fetchHistory();
                     this.fetchAdminScenes();
+            this.fetchCategories();
 
                 },
                 beforeDestroy() { if (this.pollingTimer) clearInterval(this.pollingTimer); }

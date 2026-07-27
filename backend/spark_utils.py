@@ -1,4 +1,4 @@
-﻿import os
+import os
 from pyspark.ml import PipelineModel
 from pyspark.ml.classification import RandomForestClassificationModel, GBTClassificationModel, NaiveBayesModel
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
@@ -91,53 +91,54 @@ class SparkClassifier:
                 prepped = prep_model.transform(df)
                 import pandas as pd
                 import numpy as np
-                # Convert features column: handles Vector objects, string reprs, and numpy arrays
-                def _safe_feat(v):
-                    if hasattr(v, 'toArray'):
-                        return v.toArray()
-                    if isinstance(v, str):
-                        import re
-                        m = re.match(r'\((\d+),\s*\[(.*?)\],\s*\[(.*?)\]\)', v)
-                        if m:
-                            size = int(m.group(1))
-                            idx = [int(i.strip()) for i in m.group(2).split(',') if i.strip()]
-                            vals = [float(x.strip()) for x in m.group(3).split(',') if x.strip()]
-                            arr = np.zeros(size)
-                            if idx:
-                                arr[idx] = vals
-                            return arr
-                        try:
-                            return np.array(eval(v))
-                        except:
-                            pass
-                    return np.asarray(v, dtype=np.float64)
-                # Add row ID for join-back after sklearn prediction
                 from pyspark.sql.functions import monotonically_increasing_id, col as _col
                 from pyspark.sql.types import StructType, StructField, LongType, DoubleType, ArrayType
-                prepped = prepped.withColumn("_rid", monotonically_increasing_id()).cache()
-                _ = prepped.count()  # materialize cached DataFrame
+                prepped = prepped.withColumn("_rid", monotonically_increasing_id())
+                # Convert features Vector to array BEFORE mapInPandas to avoid Arrow dict serialization
+                from pyspark.ml.functions import vector_to_array as _v2a
+                prepped = prepped.withColumn("_farr", _v2a("features"))
 
-                # Extract features to pandas (only features + _rid)
-                feat_pdf = prepped.select("_rid", "features").toPandas()
-                X = np.asarray([_safe_feat(v) for v in feat_pdf["features"]], dtype=np.float64)
-
-                if sk_model is not None:
-                    y_pred = sk_model.predict(X)
-                    y_proba = sk_model.predict_proba(X)
-                else:
-                    y_pred = np.zeros(len(X))
-                    y_proba = np.zeros((len(X), 2)); y_proba[:, 0] = 1.0
-
-                # Build minimal prediction DataFrame and join back (avoids wide pandas->Spark + UDFs)
                 pred_schema = StructType([
                     StructField("_rid", LongType(), True),
                     StructField("prediction", DoubleType(), True),
                     StructField("probability", ArrayType(DoubleType()), True),
                 ])
-                pred_rows = [(int(feat_pdf["_rid"].iloc[i]), float(y_pred[i]), y_proba[i].tolist())
-                             for i in range(len(y_pred))]
-                pred_spark = self.spark.createDataFrame(pred_rows, schema=pred_schema)
-                predictions = prepped.drop("features").join(pred_spark, "_rid").drop("_rid")
+
+                if sk_model is not None:
+                    # Broadcast model to workers for per-partition distributed prediction
+                    bc_model = self.spark.sparkContext.broadcast(sk_model)
+
+                    def _predict_partition(iterator):
+                        """Per-partition sklearn prediction a?" data stays in Spark."""
+                        model = bc_model.value
+                        for pdf in iterator:
+                            import numpy as np
+                            # _farr is ArrayType(DoubleType) - Arrow gives proper numeric arrays
+                            X = np.asarray(pdf["_farr"].tolist(), dtype=np.float64)
+                            y_pred = model.predict(X)
+                            y_proba = model.predict_proba(X)
+                            result = pdf[["_rid"]].copy()
+                            result["prediction"] = y_pred.astype(float)
+                            result["probability"] = [v.tolist() for v in y_proba]
+                            yield result
+
+                    pred_spark = prepped.select("_rid", "_farr").mapInPandas(
+                        _predict_partition, schema=pred_schema
+                    )
+                else:
+                    def _dummy_partition(iterator):
+                        for pdf in iterator:
+                            import numpy as np
+                            n = len(pdf)
+                            result = pdf[["_rid"]].copy()
+                            result["prediction"] = np.zeros(n, dtype=float)
+                            result["probability"] = [[1.0, 0.0] for _ in range(n)]
+                            yield result
+                    pred_spark = prepped.select("_rid", "_farr").mapInPandas(
+                        _dummy_partition, schema=pred_schema
+                    )
+
+                predictions = prepped.drop("features", "_farr").join(pred_spark, "_rid").drop("_rid")
                 predictions = predictions.withColumn("rawPrediction", _col("probability"))
                 _prob_is_array = True
             else:
@@ -209,7 +210,8 @@ class SparkClassifier:
                 f1 = MulticlassClassificationEvaluator(metricName="f1").evaluate(predictions)
                 acc = MulticlassClassificationEvaluator(metricName="accuracy").evaluate(predictions)
                 logger.info(f"  {model_type} -> F1: {f1*100:.2f}%, Acc: {acc*100:.2f}%")
-            feature_imp = extract_feature_importance(model, feature_cols)
+            _clf = sk_model if isinstance(model, dict) else model
+            feature_imp = extract_feature_importance(_clf, feature_cols) if _clf is not None else []
             return f1, acc, predictions, feature_imp, None
         except Exception as e:
             logger.error(f"{model_type} failed: {e}")
@@ -227,7 +229,15 @@ class SparkClassifier:
             df = validate_and_filter_columns(df, scene_type)
             df = df.fillna(0).fillna("Unknown")
             df = custom_preprocessing(df, scene_type)
+            # Reload target_col from scenes.yaml (DATASET_META is cached at startup)
             target_col = DATASET_META.get(scene_type, "")
+            if not target_col:
+                import yaml, os as _os
+                sy = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'scenes.yaml')
+                if _os.path.isfile(sy):
+                    with open(sy, 'r', encoding='utf-8') as f:
+                        sc = yaml.safe_load(f) or {}
+                    target_col = (sc.get('scenes', {}).get(scene_type, {}) or {}).get('target_col', '')
             if target_col:
                 target_col = target_col.replace(".", "_").replace(" ", "_")
             has_label = target_col in df.columns
