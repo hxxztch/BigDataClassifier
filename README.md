@@ -5,30 +5,30 @@
 
 ## 界面预览
 
-| 首页 | 配置参数 |
-|------|----------|
-| ![首页](screenshots/homepage.png) | ![配置参数](screenshots/Configuration.png) |
+### 首页
+![首页](screenshots/homepage.png)
 
-| 数据质检 |
-|----------|
-| ![数据质检](screenshots/DataInspector.png) |
+### 配置参数
+![配置参数](screenshots/Configuration.png)
 
-| 分类结果 |
-|----------|
-| ![结果1](screenshots/result_1.png) |
-| ![结果2](screenshots/result_2.png) |
+### 数据质检
+![数据质检](screenshots/DataInspector.png)
 
-| 评估指标 |
-|----------|
-| ![评估指标](screenshots/Evaluation.png) |
+### 分类结果
+![结果1](screenshots/result_1.png)
+![结果2](screenshots/result_2.png)
 
-| 场景管理 | 模型训练 |
-|----------|----------|
-| ![场景管理](screenshots/scene_management.png) | ![模型训练](screenshots/model_train.png) |
+### 评估指标
+![评估指标](screenshots/Evaluation.png)
 
-| 历史记录 |
-|----------|
-| ![历史记录](screenshots/record.png) |
+### 场景管理
+![场景管理](screenshots/scene_management.png)
+
+### 模型训练
+![模型训练](screenshots/model_train.png)
+
+### 历史记录
+![历史记录](screenshots/record.png)
 
 ## 搭建环境
 
