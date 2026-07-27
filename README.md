@@ -37,19 +37,27 @@ Spark 大数据快速分类系统是一个基于 PySpark 分布式计算框架�
 
 ## 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 大数据引擎 | Apache Spark (PySpark) |
-| 后端框架 | Flask + Gunicorn |
-| 前端框架 | Vue.js 2 + Element UI |
-| 可视化 | ECharts 5 |
-| 机器学习 | Scikit-learn + XGBoost |
-| 数据存储 | SQLite (任务记录) + YAML (场景配置) + Parquet (缓存) |
-| 环境 | Python 3.10、Java JDK 21 |
+**后端**
+![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)
+![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask)
+![Spark](https://img.shields.io/badge/Spark-3.x-orange?logo=apachespark)
+![Scikit--learn](https://img.shields.io/badge/Scikit--learn-1.x-yellow?logo=scikitlearn)
+![XGBoost](https://img.shields.io/badge/XGBoost-1.x-red)
+
+**前端**
+![Vue.js](https://img.shields.io/badge/Vue.js-2.x-brightgreen?logo=vuedotjs)
+![Element UI](https://img.shields.io/badge/Element%20UI-2.x-409EFF?logo=element)
+![ECharts](https://img.shields.io/badge/ECharts-5.x-AA344D)
+
+**数据与工具**
+![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite)
+![YAML](https://img.shields.io/badge/YAML-配置管理-CB171E)
+![Parquet](https://img.shields.io/badge/Parquet-缓存加速-50AF95)
 
 ## 项目结构
 
-`
+
+<pre>
 BigDataClassifier/
 ├── backend/               # Flask 后端、Spark 引擎、模型训练
 │   ├── app.py
@@ -67,8 +75,7 @@ BigDataClassifier/
 ├── screenshots/           # 系统截图
 ├── requirements.txt
 └── README.md
-
-`
+</pre>
 
 ## 界面预览
 ### 首页
