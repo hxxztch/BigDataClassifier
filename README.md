@@ -1,5 +1,17 @@
 
+<div align="center">
+
 # Spark 大数据快速分类系统
+
+[![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)](https://www.python.org/)
+[![Spark](https://img.shields.io/badge/Spark-3.x-orange?logo=apachespark)](https://spark.apache.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask)](https://flask.palletsprojects.com/)
+[![Vue.js](https://img.shields.io/badge/Vue.js-2.x-brightgreen?logo=vuedotjs)](https://vuejs.org/)
+[![Scikit--learn](https://img.shields.io/badge/Scikit--learn-1.x-yellow?logo=scikitlearn)](https://scikit-learn.org/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-1.x-red)](https://xgboost.readthedocs.io/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
+</div>
 
 ## 项目简介
 
