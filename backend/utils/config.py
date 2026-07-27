@@ -3,7 +3,8 @@
 if "SPARK_HOME" in os.environ:
     del os.environ["SPARK_HOME"]
 os.environ["PYSPARK_PYTHON"] = sys.executable
-os.environ["SPARK_JAVA_HOME"] = r"C:\Program Files\Java\jdk-21"
+_java_fallback = r"C:\Program Files\Java\jdk-21" if sys.platform == "win32" else "/usr/lib/jvm/default-java"
+os.environ["SPARK_JAVA_HOME"] = os.environ.get("JAVA_HOME", _java_fallback)
 
 from pyspark.sql import SparkSession
 

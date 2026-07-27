@@ -283,7 +283,7 @@
                         <el-upload
                             class="upload-demo"
                             drag
-                            action="http://localhost:5000/upload"
+                            action="/upload"
                             :on-success="handleUploadSuccess"
                             :on-error="handleUploadError"
                             :on-progress="handleUploadProgress"
@@ -863,7 +863,7 @@ methods: {
                         this.currentModelName = 'None';
                         this.currentModelProgressStatus = '正在初始化环境...';
                         
-                        axios.post('http://localhost:5000/predict', {
+                        axios.post('/predict', {
                             file_path: this.currentFilePath,
                             model_type: this.modelType,
                             scene_type: this.selectedScene
@@ -880,7 +880,7 @@ methods: {
                     pollTask(taskId) {
                         if (this.pollingTimer) clearInterval(this.pollingTimer);
                         this.pollingTimer = setInterval(() => {
-                            axios.get(`http://localhost:5000/task/${taskId}`).then(res => {
+                            axios.get(`/task/${taskId}`).then(res => {
                                 const data = res.data;
                                 if (data.current_model) this.currentModelName = data.current_model;
                                 if (data.model_progress_status) this.currentModelProgressStatus = data.model_progress_status;
@@ -928,7 +928,7 @@ methods: {
 
                     viewDetail(row) {
                         const loading = this.$loading({ lock: true, text: '正在加载详细数据...', spinner: 'el-icon-loading', background: 'rgba(0, 0, 0, 0.8)' });
-                        axios.get(`http://localhost:5000/task/${row.task_id}`).then(res => {
+                        axios.get(`/task/${row.task_id}`).then(res => {
                             loading.close();
                             if (res.data.status === 'completed' && res.data.result) {
                                 this.selectedScene = row.scene_type; this.dqPassed = false;
@@ -946,7 +946,7 @@ methods: {
                     },
 
                     fetchHistory() {
-                        axios.get('http://localhost:5000/history', { params: { page: this.historyPage, page_size: this.historyPageSize } }).then(res => { this.historyData = res.data.tasks; this.historyTotal = res.data.total; });
+                        axios.get('/history', { params: { page: this.historyPage, page_size: this.historyPageSize } }).then(res => { this.historyData = res.data.tasks; this.historyTotal = res.data.total; });
                     },
                     reset() {
                         this.step = 0;
@@ -1086,7 +1086,7 @@ methods: {
                     },
                     
                     fetchHistory() {
-                        axios.get('http://localhost:5000/history', { params: { page: this.historyPage, page_size: this.historyPageSize } }).then(res => { this.historyData = res.data.tasks; this.historyTotal = res.data.total; });
+                        axios.get('/history', { params: { page: this.historyPage, page_size: this.historyPageSize } }).then(res => { this.historyData = res.data.tasks; this.historyTotal = res.data.total; });
                     },
                     reset() {
                         this.step = 0;
