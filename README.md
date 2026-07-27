@@ -1,16 +1,44 @@
-﻿# Spark 大数据快速分类系统
 
-基于 PySpark + Flask 的大数据分类预测平台，支持多种机器学习模型（随机森林、GBDT、XGBoost、朴素贝叶斯）。
+# Spark 大数据快速分类系统
 
-## 环境要求
+基于 PySpark + Flask 的大数据分类预测平台，支持多种机器学习模型。
 
-- Python 3.8+
-- Java JDK 8 / 11 / 17 / 21（PySpark 依赖）
-- Windows / Linux / macOS
+## 界面预览
+
+| 首页 | 配置参数 |
+|------|----------|
+| ![首页](screenshots/homepage.png) | ![配置参数](screenshots/Configuration.png) |
+
+| 数据质检 |
+|----------|
+| ![数据质检](screenshots/DataInspector.png) |
+
+| 分类结果 |
+|----------|
+| ![结果1](screenshots/result_1.png) |
+| ![结果2](screenshots/result_2.png) |
+
+| 评估指标 |
+|----------|
+| ![评估指标](screenshots/Evaluation.png) |
+
+| 场景管理 | 模型训练 |
+|----------|----------|
+| ![场景管理](screenshots/scene_management.png) | ![模型训练](screenshots/model_train.png) |
+
+| 历史记录 |
+|----------|
+| ![历史记录](screenshots/record.png) |
+
+## 搭建环境
+
+- Python 3.10.2
+- Java 21
+- Windows
 
 ## 快速开始
 
-`ash
+`Bash
 # 1. 安装依赖
 pip install -r requirements.txt
 
@@ -23,17 +51,20 @@ http://localhost:5000
 
 ## 目录说明
 
-- ackend/ — Flask 后端、Spark 处理、模型训练
-- rontend/ — 前端单页应用
-- models/ — 训练好的模型文件
-- ackend/datasets/ — 训练数据集
-- data/ — 上传文件、缓存
+| 目录 | 说明 |
+|------|------|
+| backend/ | Flask 后端、Spark 处理、模型训练 |
+| frontend/ | 前端单页应用 |
+| models/ | 训练好的模型文件 |
+| backend/datasets/ | 训练数据集 |
+| data/ | 上传文件、缓存 |
+| screenshots/ | 界面截图 |
 
 ## 使用流程
 
-1. 系统管理 → 场景管理 → 添加场景
-2. 系统管理 → 模型训练 → 选择数据集和场景训练
-3. 分类预测 → 上传 CSV → 数据质检 → 开始分析
+1. **添加场景**：系统管理 → 场景管理 → 添加场景（填写 ID、名称、目标列、分类）
+2. **训练模型**：系统管理 → 模型训练 → 选择数据集和场景 → 开始训练
+3. **数据预测**：分类预测 → 上传 CSV → 选择场景和模型 → 数据质检 → 开始分析
 
 ## 环境变量
 

@@ -856,7 +856,13 @@ scenes:
     description: ''
     target_col: Machine_failure
     label_map: {}
-    required_cols: []
+    required_cols:
+    - Type
+    - Air_temperature_[K]
+    - Process_temperature_[K]
+    - Rotational_speed_[rpm]
+    - Torque_[Nm]
+    - Tool_wear_[min]
     preprocessing: ind_failure
   '1':
     name: testquality
