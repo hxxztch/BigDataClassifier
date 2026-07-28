@@ -1,17 +1,7 @@
 
 # Spark 大数据快速分类系统
 
-> 基于 PySpark + Flask 的大数据分类预测平台，支持多种机器学习模型
-
-![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)
-![Spark](https://img.shields.io/badge/Spark-3.x-orange?logo=apachespark)
-![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask)
-![Vue.js](https://img.shields.io/badge/Vue.js-2.x-brightgreen?logo=vuedotjs)
-![Scikit--learn](https://img.shields.io/badge/Scikit--learn-1.x-yellow?logo=scikitlearn)
-![XGBoost](https://img.shields.io/badge/XGBoost-1.x-red)
-![License](https://img.shields.io/badge/License-MIT-green)
-
----
+基于 PySpark + Flask 的大数据分类预测平台，支持多种机器学习模型。
 
 ## 项目简介
 
@@ -37,56 +27,45 @@ Spark 大数据快速分类系统是一个基于 PySpark 分布式计算框架�
 
 ## 技术栈
 
-### 前端
-
-| 技术 | 用途 |
+| 层级 | 技术 |
 |------|------|
-| Vue.js 2 | 前端框架 |
-| Element UI | UI 组件库 |
-| ECharts 5 | 数据可视化 |
-| Axios | HTTP 请求 |
-
-### 后端
-
-| 技术 | 用途 |
-|------|------|
-| Python 3.10 | 开发语言 |
-| Flask 2.x | Web 框架 |
-| PySpark 3.x | 分布式计算引擎 |
-| Scikit-learn 1.x | 机器学习 |
-| XGBoost 1.x | 梯度提升模型 |
-
-### 数据与存储
-
-| 技术 | 用途 |
-|------|------|
-| SQLite | 任务记录存储 |
-| YAML | 场景配置管理 |
-| Parquet | 数据缓存加速 |
-| Java JDK 21 | Spark 运行环境 |
+| 大数据引擎 | Apache Spark (PySpark) |
+| 后端框架 | Flask + Gunicorn |
+| 前端框架 | Vue.js 2 + Element UI |
+| 可视化 | ECharts 5 |
+| 机器学习 | Scikit-learn + XGBoost |
+| 数据存储 | SQLite (任务记录) + YAML (场景配置) + Parquet (缓存) |
+| 环境 | Python 3.10、Java JDK 21 |
 
 ## 项目结构
 
-
-<pre>
+`
 BigDataClassifier/
-├── backend/               # Flask 后端、Spark 引擎、模型训练
-│   ├── app.py
-│   ├── admin_routes.py
-│   ├── spark_utils.py
-│   ├── train_sklearn.py
-│   ├── scenes.yaml
-│   ├── datasets/
-│   └── utils/
+├── backend/                  # 后端服务
+│   ├── app.py                # Flask 主应用
+│   ├── admin_routes.py       # 系统管理、场景管理、训练 API
+│   ├── spark_utils.py        # Spark 分类预测引擎
+│   ├── train_sklearn.py      # sklearn 模型训练
+│   ├── train_worker.py       # 训练子进程入口
+│   ├── database.py           # SQLite 数据库操作
+│   ├── scenes.yaml           # 场景配置文件
+│   ├── datasets/             # 训练数据集
+│   └── utils/                # 工具模块
+│       ├── config.py         # 全局配置、Spark 初始化
+│       ├── preprocessing.py  # 数据预处理与特征工程
+│       ├── data_quality.py   # 数据质量检测
+│       └── version_manager.py# 模型版本管理
 ├── frontend/
-│   └── index.html         # Vue.js 单页应用
-├── models/                # 已训练模型文件
-├── data/                  # 上传文件与缓存
-├── jars/                  # Spark 扩展 JAR
-├── screenshots/           # 系统截图
-├── requirements.txt
+│   └── index.html            # 前端单页应用
+├── models/                   # 训练好的模型文件
+├── data/                     # 上传文件与缓存
+│   ├── uploads/
+│   └── cache/
+├── jars/                     # Spark 扩展 JAR
+├── screenshots/              # 系统截图
+├── requirements.txt          # Python 依赖
 └── README.md
-</pre>
+`
 
 ## 界面预览
 ### 首页
@@ -121,8 +100,6 @@ BigDataClassifier/
 - Windows
 
 ## 快速开始
-
-`Bash
 # 1. 安装依赖
 pip install -r requirements.txt
 
