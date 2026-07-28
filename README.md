@@ -102,12 +102,12 @@ BigDataClassifier/
 ## 快速开始
 
 1. **安装依赖**
-   `ash
+   `
    pip install -r requirements.txt
    `
 
 2. **启动后端**
-   `ash
+   `
    python backend/app.py
    `
 
