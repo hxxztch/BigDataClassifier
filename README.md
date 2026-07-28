@@ -39,8 +39,8 @@ Spark 大数据快速分类系统是一个基于 PySpark 分布式计算框架�
 
 ## 项目结构
 
-`
-BigDataClassifier/
+<pre>
+gDataClassifier/
 ├── backend/                  # 后端服务
 │   ├── app.py                # Flask 主应用
 │   ├── admin_routes.py       # 系统管理、场景管理、训练 API
@@ -64,8 +64,8 @@ BigDataClassifier/
 ├── jars/                     # Spark 扩展 JAR
 ├── screenshots/              # 系统截图
 ├── requirements.txt          # Python 依赖
-└── README.md
-`
+└── README.m
+</pre>
 
 ## 界面预览
 ### 首页
