@@ -100,12 +100,18 @@ BigDataClassifier/
 - Windows
 
 ## 快速开始
-# 1. 安装依赖
-pip install -r requirements.txt
 
-# 2. 启动后端
-python backend/app.py
+1. **安装依赖**
+   `ash
+   pip install -r requirements.txt
+   `
 
-# 3. 打开浏览器访问
-http://localhost:5000
-`
+2. **启动后端**
+   `ash
+   python backend/app.py
+   `
+
+3. **打开浏览器访问**
+   `
+   http://localhost:5000
+   `
