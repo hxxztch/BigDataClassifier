@@ -22,7 +22,7 @@ from utils.preprocessing import clean_column_names, custom_preprocessing, build_
 from utils.logger import get_logger
 from utils.version_manager import next_version as _next_ver, register as _reg_ver
 
-logger = get_logger("sklearn_trainer")
+logger = get_logger("spark_trainer")
 
 
 def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
