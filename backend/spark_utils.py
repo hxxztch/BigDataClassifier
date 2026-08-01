@@ -34,12 +34,24 @@ class SparkClassifier:
         logger.info("SparkClassifier initialized")
 
     def _load_model(self, model_type, scene_type):
+        base_dir = _version_base(self.models_dir, scene_type)
+
+        # ---- Try MLlib PipelineModel first (distributed training output) ----
+        mllib_name = f"{scene_type}_{model_type}_mllib"
+        mllib_path = os.path.join(base_dir, mllib_name)
+        if os.path.exists(mllib_path):
+            try:
+                mllib_model = PipelineModel.load(mllib_path)
+                logger.info(f"Loaded MLlib PipelineModel: {mllib_name}")
+                return {"model_type": model_type, "pipeline": mllib_model, "backend": "mllib"}, None
+            except Exception as e:
+                logger.warning(f"MLlib load failed for {model_type}: {e}, falling back to sklearn")
+
+        # ---- Fallback: sklearn pickle-based model ----
         model_name = f"{scene_type}_{model_type}.model"
-        model_path = os.path.join(_version_base(self.models_dir, scene_type), model_name)
+        model_path = os.path.join(base_dir, model_name)
         if not os.path.exists(model_path):
             return None, f"Model file not found: {model_name}"
-        
-        # All models now use sklearn (pickle-based), trained by train_sklearn.py
         pkl_name = "sklearn_model.pkl"
         pkl_path = os.path.join(model_path, pkl_name)
         if not os.path.exists(pkl_path):
@@ -85,7 +97,27 @@ class SparkClassifier:
             logger.info(f"Running: {model_type} ...")
             # Check if model is sklearn-based (dict with preprocessing + sklearn_model)
             _prob_is_array = False
-            if isinstance(model, dict):
+            # ---- Branch: MLlib PipelineModel (distributed, native prediction) ----
+            if isinstance(model, dict) and model.get("backend") == "mllib":
+                mllib_pipeline = model["pipeline"]
+                predictions = mllib_pipeline.transform(df)
+
+                # Add confidence from probability column
+                if "probability" in predictions.columns:
+                    from pyspark.ml.functions import vector_to_array as _vta
+                    _parr = _vta(col("probability"))
+                    predictions = predictions.withColumn("confidence_0", _parr[0].cast("double"))
+                    predictions = predictions.withColumn("confidence_1", _parr[1].cast("double"))
+                    predictions = predictions.withColumn(
+                        "confidence",
+                        when(col("prediction") == 0.0, col("confidence_0"))
+                        .otherwise(col("confidence_1"))
+                    )
+                else:
+                    predictions = predictions.withColumn("confidence", lit(0.0))
+
+            # ---- Branch: sklearn model (pickle-based, mapInPandas prediction) ----
+            elif isinstance(model, dict) and "preprocessing" in model:
                 prep_model = model["preprocessing"]
                 sk_model = model.get("sklearn_model")
                 prepped = prep_model.transform(df)
@@ -210,8 +242,15 @@ class SparkClassifier:
                 f1 = MulticlassClassificationEvaluator(metricName="f1").evaluate(predictions)
                 acc = MulticlassClassificationEvaluator(metricName="accuracy").evaluate(predictions)
                 logger.info(f"  {model_type} -> F1: {f1*100:.2f}%, Acc: {acc*100:.2f}%")
-            _clf = sk_model if isinstance(model, dict) else model
-            feature_imp = extract_feature_importance(_clf, feature_cols) if _clf is not None else []
+            # Extract feature importance (handles both sklearn and MLlib models)
+            if isinstance(model, dict) and model.get("backend") == "mllib":
+                # MLlib PipelineModel: extract from classifier stage
+                _stages = model["pipeline"].stages
+                _clf_stage = _stages[-1] if _stages else None
+                feature_imp = extract_feature_importance(_clf_stage, feature_cols) if _clf_stage is not None else []
+            else:
+                _clf = sk_model if isinstance(model, dict) else model
+                feature_imp = extract_feature_importance(_clf, feature_cols) if _clf is not None else []
             return f1, acc, predictions, feature_imp, None
         except Exception as e:
             logger.error(f"{model_type} failed: {e}")

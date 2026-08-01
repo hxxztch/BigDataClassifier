@@ -84,6 +84,106 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
         if progress_callback: progress_callback(20, '特征工程完成')
         logger.info(f"  Preprocessing saved: {prep_save}")
 
+        # ==================================================================
+        # Phase 1: Spark MLlib distributed training (RF / GBT / NB)
+        # Trains on FULL dataset using Spark-native classifiers.
+        # Each saves as complete PipelineModel for single-call prediction.
+        # ==================================================================
+        from pyspark.ml.classification import (
+            RandomForestClassifier as SparkRF,
+            GBTClassifier as SparkGBT,
+            NaiveBayes as SparkNB,
+        )
+        from pyspark.ml import Pipeline as MLlibPipeline
+        from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+
+        _train_ver = _next_ver(MODELS_DIR, task_name)
+        _train_base = os.path.join(MODELS_DIR, "v" + str(_train_ver)) if _train_ver > 1 else MODELS_DIR
+        if _train_ver > 1 and not os.path.exists(_train_base):
+            os.makedirs(_train_base)
+
+        mllib_classifiers = {
+            "random_forest": SparkRF(
+                featuresCol="features", labelCol="label",
+                numTrees=100, maxDepth=10, seed=42,
+            ),
+            "gbdt": SparkGBT(
+                featuresCol="features", labelCol="label",
+                maxIter=100, maxDepth=5, seed=42,
+            ),
+            "naive_bayes": SparkNB(
+                featuresCol="features", labelCol="label",
+            ),
+        }
+
+        mllib_results = {}
+        for _idx, (algo_name, spark_clf) in enumerate(mllib_classifiers.items()):
+            if progress_callback:
+                progress_callback(22 + _idx * 2, f"Spark MLlib: {algo_name}...")
+
+            mllib_save = os.path.join(
+                _train_base, f"{task_name}_{algo_name}_mllib"
+            )
+            if os.path.exists(mllib_save):
+                shutil.rmtree(mllib_save)
+
+            logger.info(f"  [MLlib] Training {algo_name} on full dataset...")
+            t0 = time.time()
+            try:
+                full_stages = list(stages) + [spark_clf]
+                full_pipeline = MLlibPipeline(stages=full_stages)
+                full_model = full_pipeline.fit(df)
+
+                train_preds = full_model.transform(df)
+                acc_eval = MulticlassClassificationEvaluator(
+                    labelCol="label", predictionCol="prediction",
+                    metricName="accuracy"
+                )
+                f1_eval = MulticlassClassificationEvaluator(
+                    labelCol="label", predictionCol="prediction",
+                    metricName="f1"
+                )
+                train_acc = acc_eval.evaluate(train_preds)
+                train_f1 = f1_eval.evaluate(train_preds)
+
+                full_model.write().overwrite().save(mllib_save)
+
+                elapsed = time.time() - t0
+                mllib_results[algo_name] = {
+                    "accuracy": round(float(train_acc), 4),
+                    "f1_score": round(float(train_f1), 4),
+                }
+                logger.info(
+                    f"    [MLlib] {algo_name} -> F1={train_f1*100:.2f}% "
+                    f"Acc={train_acc*100:.2f}% ({elapsed:.1f}s)"
+                )
+
+                # Save metadata
+                mllib_meta = {
+                    "model_type": algo_name,
+                    "scene": task_name,
+                    "training_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "f1_score": round(float(train_f1), 4),
+                    "accuracy": round(float(train_acc), 4),
+                    "train_size": total_rows,
+                    "num_classes": len(df.select("label").distinct().collect()),
+                    "backend": "Spark MLlib (distributed)",
+                }
+                with open(os.path.join(mllib_save, "metadata.json"), "w") as mf:
+                    json.dump(mllib_meta, mf, indent=2)
+
+            except Exception as ml_err:
+                logger.error(f"    [MLlib] {algo_name} FAILED: {ml_err}")
+                mllib_results[algo_name] = {"accuracy": 0.0, "f1_score": 0.0}
+
+        if progress_callback:
+            progress_callback(28, "MLlib finished")
+        logger.info(f"  MLlib phase complete: {len(mllib_results)} models")
+
+        # ==================================================================
+        # Phase 2: sklearn single-machine training (XGBoost + calibration)
+        # ==================================================================
+
         # Transform to pandas (sample to 30k rows max to avoid OOM)
         final_df_full = prep_model.transform(df).select("features", "label")
         total_rows = final_df_full.count()
