@@ -60,13 +60,9 @@ def _train_subprocess(scene_id, csv_path, mode="local"):
             env["USE_SPARK_CLUSTER"] = "true"
         else:
             env["SPARK_MASTER_URL"] = "local[*]"
-        
         try:
-            stderr_log = os.path.join(_BACKEND_DIR, "train_stderr_" + scene_id + ".log")
-            with open(stderr_log, "w") as _se:
-                proc = subprocess.Popen([sys.executable, train_worker, scene_id, csv_path],
-                                       cwd=_BACKEND_DIR, env=env,
-                                       stderr=_se, stdout=_se)
+            proc = subprocess.Popen([sys.executable, train_worker, scene_id, csv_path],
+                                   cwd=_BACKEND_DIR, env=env)
             with _lock:
                 _training_tasks[scene_id]["_proc"] = proc
                 _training_tasks[scene_id]["_status_file"] = os.path.join(
@@ -305,13 +301,7 @@ def training_status_one(scene_id):
             ret = proc.poll()
             if ret is not None:
                 s["status"] = "failed"
-                tf_err = ""
-                try:
-                    with open(stderr_log, "r") as _ef:
-                        _err_text = _ef.read()[-1000:]
-                    tf_err = " (stderr: " + _err_text[-200:] + ")"
-                except: pass
-                s["error"] = "Training process exited unexpectedly" + tf_err
+                s["error"] = "Training process exited unexpectedly"
                 with _lock:
                     if scene_id in _training_tasks:
                         sf2 = _training_tasks[scene_id].pop("_status_file", None)

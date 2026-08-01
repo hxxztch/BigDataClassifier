@@ -1,0 +1,4 @@
+  File "e:\Study\Spark大数据快速分类\BigDataClassifier\backend\train_worker.py", line 50
+    algo_names = {"random_forest": "闅忔満妫\ue1bd灄", "gbdt": "GBDT", "xgboost": "XGBoost", "naive_bayes": "鏈寸礌璐濆彾鏂?}
+                                                                                                  ^
+SyntaxError: unterminated string literal (detected at line 50)
