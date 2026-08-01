@@ -41,7 +41,7 @@ def _model_status(scene_id):
             result[mt] = {"exists": False}
     return result
 
-def _train_subprocess(scene_id, csv_path):
+def _train_subprocess(scene_id, csv_path, mode="local"):
     """Run training in isolated subprocess with clean MKL environment."""
     _status = {"status": "running", "progress": 0, "error": None}
     with _lock:
@@ -55,7 +55,11 @@ def _train_subprocess(scene_id, csv_path):
         env["MKL_THREADING_LAYER"] = "sequential"
         env["NUMEXPR_NUM_THREADS"] = "1"
         env["VECLIB_MAXIMUM_THREADS"] = "1"
-        env["SPARK_MASTER_URL"] = os.environ.get("SPARK_MASTER_URL", "local[*]")
+        if mode == "cluster":
+            env["SPARK_MASTER_URL"] = "spark://127.0.0.1:7077"
+            env["USE_SPARK_CLUSTER"] = "true"
+        else:
+            env["SPARK_MASTER_URL"] = "local[*]"
         
         try:
             proc = subprocess.Popen([sys.executable, train_worker, scene_id, csv_path],
@@ -246,7 +250,8 @@ def train_scene(scene_id):
     if not os.path.isfile(csv_path):
         return jsonify({"error": "No CSV"}), 400
     # Run training in-process using shared Spark (no new Spark session)
-    t = threading.Thread(target=_train_subprocess, args=(scene_id, csv_path))
+    mode = (request.get_json() or {}).get("mode", "local")
+        t = threading.Thread(target=_train_subprocess, args=(scene_id, csv_path, mode))
     t.daemon = True; t.start()
     return jsonify({"ok": True, "scene_id": scene_id, "status": "started"})
 
@@ -258,7 +263,8 @@ def train_all():
     for sid in scenes:
         csv_path = os.path.join(_DATA_DIR, f"{sid}.csv")
         if os.path.isfile(csv_path):
-            t = threading.Thread(target=_train_subprocess, args=(sid, csv_path))
+            mode_all = (request.get_json() or {}).get("mode", "local")
+            t = threading.Thread(target=_train_subprocess, args=(sid, csv_path, mode_all))
             t.daemon = True; t.start()
     return jsonify({"ok": True})
 

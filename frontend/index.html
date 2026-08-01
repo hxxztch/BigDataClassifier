@@ -535,6 +535,16 @@
                         <div v-show="adminSubTab==='scenes'">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                                 <h3 style="margin:0;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">场景管理</h3>
+                <div style="margin-bottom:15px;display:flex;align-items:center;">
+                    <span style="color:#8892b0;margin-right:8px;">训练模式:</span>
+                    <el-radio-group v-model="trainingMode" size="small">
+                        <el-radio-button label="local">本地</el-radio-button>
+                        <el-radio-button label="cluster">集群</el-radio-button>
+                    </el-radio-group>
+                    <span style="color:#64ffda;font-size:12px;margin-left:10px;">
+                        {{ trainingMode === 'cluster' ? '（需先启动集群）' : '（默认，无需集群）' }}
+                    </span>
+                </div>
                             <div style="margin-bottom:16px;padding:10px 14px;background:rgba(100,255,218,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                                 <span style="color:#8892b0;font-size:13px;">分类管理:</span>
                                 <el-tag v-for="cat in adminCategories" :key="cat" closable size="small" @close="deleteCategory(cat)">{{ cat }}</el-tag>
@@ -761,6 +771,7 @@
                     showManual: false,
                     validationErrorDialog: { visible: false, message: '' },
                     showAddSceneDialog: false,
+                    trainingMode: "local",
                     addSceneStep: 1,
                     analyzeResult: null,
                     addSceneConfig: {},
@@ -1133,7 +1144,7 @@ methods: {
                             this.trainingPath = r.data.path || "";
                             this.uploadFileName = "";
                             this.uploadFile = null;
-                            return axios.post("/api/admin/scenes/" + this.trainingScene + "/train", {dataset_path: this.trainingPath});
+                            return axios.post("/api/admin/scenes/" + this.trainingScene + "/train", {dataset_path: this.trainingPath, mode: this.trainingMode});
                         }).then(r => {
                             this.$message.success("训练已启动");
                             setTimeout(() => this.pollTrainingStatus(), 3000);
