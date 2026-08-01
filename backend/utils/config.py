@@ -166,7 +166,7 @@ def get_spark_builder(app_name="SparkPredictor", driver_memory="4g", executor_me
         builder = builder \
             .config("spark.submit.deployMode", "client") \
             .config("spark.executor.cores", "2") \
-            .config("spark.dynamicAllocation.enabled", "false") \\
+            .config("spark.dynamicAllocation.enabled", "false") \
             .config("spark.jars.packages", "ml.dmlc:xgboost4j-spark_2.12:2.1.4")
     if _HAS_RAPIDS and _GPU_ACCELERATION_ENABLED:
         builder = builder.config("spark.jars", _RAPIDS_JAR_URI)
