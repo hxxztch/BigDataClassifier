@@ -55,15 +55,8 @@ def _train_subprocess(scene_id, csv_path):
         env["MKL_THREADING_LAYER"] = "sequential"
         env["NUMEXPR_NUM_THREADS"] = "1"
         env["VECLIB_MAXIMUM_THREADS"] = "1"
-        env["SPARK_MASTER_URL"] = os.environ.get("SPARK_MASTER_URL", "spark://127.0.0.1:7077")
-        env["USE_SPARK_CLUSTER"] = "true"
-
-        # Auto-detect: if cluster not reachable, fall back to local mode
-        import urllib.request
-        try:
-            urllib.request.urlopen("http://127.0.0.1:7077", timeout=2)
-        except Exception:
-            env["SPARK_MASTER_URL"] = "local[*]"
+        env["SPARK_MASTER_URL"] = os.environ.get("SPARK_MASTER_URL", "local[*]")
+        
         try:
             proc = subprocess.Popen([sys.executable, train_worker, scene_id, csv_path],
                                    cwd=_BACKEND_DIR, env=env)

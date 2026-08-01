@@ -37,12 +37,17 @@ try:
     def _on_progress(pct, text):
         _write_status("running", pct, progress_text=text)
 
-    _write_status("running", 10, progress_text="正在启动训练进程...")
-    train_sklearn(csv_path, scene_id, progress_callback=_on_progress)
+    _write_status("running", 10, progress_text="姝ｅ湪鍚姩璁粌杩涚▼...")
+    try:
+        train_sklearn(csv_path, scene_id, progress_callback=_on_progress)
+    except Exception as _e:
+        import traceback
+        traceback.print_exc()
+        raise
 
     _write_status("running", 90, progress_text="????????...")
     best_acc = 0.0; best_algo = ""; results = []
-    algo_names = {"random_forest": "随机森林", "gbdt": "GBDT", "xgboost": "XGBoost", "naive_bayes": "朴素贝叶斯"}
+    algo_names = {"random_forest": "闅忔満妫灄", "gbdt": "GBDT", "xgboost": "XGBoost", "naive_bayes": "鏈寸礌璐濆彾鏂?}
     search_dirs = [MODELS_DIR]
     if os.path.isdir(MODELS_DIR):
         search_dirs += [os.path.join(MODELS_DIR, d) for d in os.listdir(MODELS_DIR)
@@ -66,7 +71,7 @@ try:
                 found = True
                 break
         if not found:
-            results.append({"algo": algo_names.get(mt, mt), "status": "fail", "error": "未找到模型"})
+            results.append({"algo": algo_names.get(mt, mt), "status": "fail", "error": "鏈壘鍒版ā鍨?})
 
     _write_status("completed", 100, accuracy=best_acc, best_algo=best_algo, progress_text="????", results=results)
 except Exception as e:
