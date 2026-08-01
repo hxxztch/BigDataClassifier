@@ -167,7 +167,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
                     "f1_score": round(float(train_f1), 4),
                     "accuracy": round(float(train_acc), 4),
                     "train_size": total_rows,
-                    "num_classes": len(df.select("label").distinct().collect()),
+                    "num_classes": len(train_preds.select("label").distinct().collect()),
                     "backend": "Spark MLlib (distributed)",
                 }
                 with open(os.path.join(mllib_save, "metadata.json"), "w") as mf:
