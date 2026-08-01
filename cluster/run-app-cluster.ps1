@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Launch Flask app with Spark Standalone Cluster mode enabled.
 .DESCRIPTION
@@ -28,7 +28,7 @@ Write-Host "  Web UI      : http://localhost:5000"         -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
-$backendDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$backendDir = (Split-Path -Parent $PSScriptRoot)
 $backendDir = Join-Path $backendDir "backend"
 Set-Location $backendDir
 python app.py

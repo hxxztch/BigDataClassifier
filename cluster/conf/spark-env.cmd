@@ -1,7 +1,7 @@
 @echo off
 REM === Spark Standalone Cluster Environment ===
 REM Master settings
-set SPARK_MASTER_HOST=localhost
+set SPARK_MASTER_HOST=127.0.0.1
 set SPARK_MASTER_PORT=7077
 set SPARK_MASTER_WEBUI_PORT=8080
 

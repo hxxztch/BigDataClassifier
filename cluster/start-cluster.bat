@@ -1,6 +1,6 @@
 @echo off
 set SPARK_HOME=E:\bigdata\spark-3.3.0-bin-hadoop3
-set JAVA_HOME=C:\Program Files\Java\jdk-21
+set JAVA_HOME=C:\Program Files\Java\jdk-17.0.20
 set PATH=%SPARK_HOME%\bin;%JAVA_HOME%\bin;%PATH%
 
 echo ============================================
@@ -10,7 +10,7 @@ echo   Master Web: http://localhost:9090
 echo ============================================
 
 echo [1/4] Starting Master (Web UI on :9090)...
-start "SparkMaster" /MIN %SPARK_HOME%\bin\spark-class.cmd org.apache.spark.deploy.master.Master --host localhost --port 7077 --webui-port 9090
+start "SparkMaster" /MIN %SPARK_HOME%\bin\spark-class.cmd org.apache.spark.deploy.master.Master --host 127.0.0.1 --port 7077 --webui-port 9090
 timeout /t 8 /nobreak >nul
 
 echo [2/4] Starting Worker 1 (Web UI :8081)...
