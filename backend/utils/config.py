@@ -137,19 +137,31 @@ if _SPARK_JAVA_HOME:
 
 
 def get_spark_builder(app_name="SparkPredictor", driver_memory="4g", executor_memory="4g"):
+    _cluster_enabled = os.environ.get("USE_SPARK_CLUSTER", "").lower() == "true"
+    if _cluster_enabled:
+        _master = "spark://localhost:7077"
+    else:
+        _master = os.environ.get("SPARK_MASTER_URL", "local[*]")
     builder = SparkSession.builder \
         .appName(app_name) \
-        .master(os.environ.get("SPARK_MASTER_URL", "local[*]")) \
+        .master(_master) \
         .config("spark.driver.memory", driver_memory) \
         .config("spark.executor.memory", executor_memory) \
         .config("spark.sql.warehouse.dir", WAREHOUSE_DIR) \
-        .config("spark.ui.enabled", "false") \
+        .config("spark.ui.enabled", "true" if _cluster_enabled else "false") \
         .config("spark.ui.showConsoleProgress", "false") \
         .config("spark.driver.extraJavaOptions",
                 "-Dcom.github.fommil.netlib.BLAS=com.github.fommil.netlib.F2jBLAS " +
                 "-Dcom.github.fommil.netlib.LAPACK=com.github.fommil.netlib.F2jLAPACK " +
-                "-Dcom.github.fommil.netlib.ARPACK=com.github.fommil.netlib.F2jARPACK") \
-        .config("spark.rpc.message.maxSize", "256")
+                "-Dcom.github.fommil.netlib.ARPACK=com.github.fommil.netlib.F2jARPACK")
+    if not _cluster_enabled:
+        builder = builder \
+            .config("spark.rpc.message.maxSize", "256")
+    if _cluster_enabled:
+        builder = builder \
+            .config("spark.submit.deployMode", "client") \
+            .config("spark.executor.cores", "2") \
+            .config("spark.dynamicAllocation.enabled", "false")
     if _HAS_RAPIDS and _GPU_ACCELERATION_ENABLED:
         builder = builder.config("spark.jars", _RAPIDS_JAR_URI)
     return builder
