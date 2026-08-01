@@ -259,10 +259,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
         }
 
         results = {}
-        _train_ver = _next_ver(MODELS_DIR, task_name)
-        _train_base = os.path.join(MODELS_DIR, "v" + str(_train_ver)) if _train_ver > 1 else MODELS_DIR
-        if _train_ver > 1 and not os.path.exists(_train_base):
-            os.makedirs(_train_base)
+        # _train_ver and _train_base already computed in Phase 1 MLlib block
 
         for algo_name, clf in classifiers.items():
             if progress_callback: progress_callback(40 + list(classifiers.keys()).index(algo_name) * 15, f'训练中: {algo_name}...')

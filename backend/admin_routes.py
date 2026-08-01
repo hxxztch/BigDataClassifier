@@ -55,7 +55,7 @@ def _train_subprocess(scene_id, csv_path):
         env["MKL_THREADING_LAYER"] = "sequential"
         env["NUMEXPR_NUM_THREADS"] = "1"
         env["VECLIB_MAXIMUM_THREADS"] = "1"
-        env["SPARK_MASTER_URL"] = "local[2]"
+        env["SPARK_MASTER_URL"] = os.environ.get("SPARK_MASTER_URL", "spark://127.0.0.1:7077")
         try:
             proc = subprocess.Popen([sys.executable, train_worker, scene_id, csv_path],
                                    cwd=_BACKEND_DIR, env=env)
