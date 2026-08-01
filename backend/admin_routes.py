@@ -251,7 +251,7 @@ def train_scene(scene_id):
         return jsonify({"error": "No CSV"}), 400
     # Run training in-process using shared Spark (no new Spark session)
     mode = (request.get_json() or {}).get("mode", "local")
-        t = threading.Thread(target=_train_subprocess, args=(scene_id, csv_path, mode))
+    t = threading.Thread(target=_train_subprocess, args=(scene_id, csv_path, mode))
     t.daemon = True; t.start()
     return jsonify({"ok": True, "scene_id": scene_id, "status": "started"})
 
