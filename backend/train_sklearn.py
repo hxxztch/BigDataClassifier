@@ -1,4 +1,4 @@
-import os, json, time, pickle, glob, shutil, sys
+﻿import os, json, time, pickle, glob, shutil, sys
 import numpy as np
 
 os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -59,7 +59,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
         df = clean_column_names(df)
         df = df.fillna(0).fillna("Unknown")
         df = custom_preprocessing(df, task_name)
-        if progress_callback: progress_callback(10, '数据预处理完成')
+        if progress_callback: progress_callback(10, '鏁版嵁棰勫鐞嗗畬鎴?)
 
         target_col_clean = target_col.replace(".", "_").replace(" ", "_")
         if target_col_clean not in df.columns:
@@ -81,10 +81,14 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
         if os.path.exists(prep_save):
             shutil.rmtree(prep_save)
         prep_model.write().overwrite().save(prep_save)
-        if progress_callback: progress_callback(20, '特征工程完成')
+        if progress_callback: progress_callback(20, '鐗瑰緛宸ョ▼瀹屾垚')
         logger.info(f"  Preprocessing saved: {prep_save}")
 
         # ==================================================================
+        
+        # Compute total rows for MLlib metadata
+        total_rows = df.count()
+
         # Phase 1: Spark MLlib distributed training (RF / GBT / NB)
         # Trains on FULL dataset using Spark-native classifiers.
         # Each saves as complete PipelineModel for single-call prediction.
@@ -222,7 +226,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
                     pass
             return np.asarray(v, dtype=np.float64)
         X = np.asarray([_safe_feat(v) for v in pdf["features"]], dtype=np.float64)
-        if progress_callback: progress_callback(30, '特征提取完成，开始训练模型')
+        if progress_callback: progress_callback(30, '鐗瑰緛鎻愬彇瀹屾垚锛屽紑濮嬭缁冩ā鍨?)
         y = pdf["label"].values.astype(int)
 
         row_count = len(pdf)
@@ -253,7 +257,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
             os.makedirs(_train_base)
 
         for algo_name, clf in classifiers.items():
-            if progress_callback: progress_callback(40 + list(classifiers.keys()).index(algo_name) * 15, f'训练中: {algo_name}...')
+            if progress_callback: progress_callback(40 + list(classifiers.keys()).index(algo_name) * 15, f'璁粌涓? {algo_name}...')
             save_path = os.path.join(_train_base, f"{task_name}_{algo_name}.model")
             if os.path.exists(save_path):
                 shutil.rmtree(save_path)
@@ -318,7 +322,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
             elapsed = time.time() - start
             logger.info(f"    {algo_name} F1: {f1*100:.2f}% (Acc: {acc*100:.2f}%) - {elapsed:.1f}s")
 
-        if progress_callback: progress_callback(90, '保存结果中...')
+        if progress_callback: progress_callback(90, '淇濆瓨缁撴灉涓?..')
         _reg_ver(MODELS_DIR, task_name, _train_ver, results, dataset=task_name + ".csv", rows=row_count)
         logger.info(f"  Registered version {_train_ver} ({len(results)} models)")
 

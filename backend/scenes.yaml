@@ -184,7 +184,6 @@ scenes:
     - DEP_TIME
     - DEP_TIME_BLK
     - DISTANCE
-    - DEP_DEL15
     features_desc: DAY_OF_MONTH, DAY_OF_WEEK, …, DISTANCE
   trans_accident:
     name: 交通事故定责

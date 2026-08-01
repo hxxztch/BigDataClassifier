@@ -1,4 +1,8 @@
-﻿import os, sys, json, subprocess, urllib.parse
+﻿
+# ── Force JDK 17 for Spark (must be set before any pyspark import) ──
+import os as _os_java
+_os_java.environ.setdefault("JAVA_HOME", r"C:\Program Files\Java\jdk-17.0.20")
+import os, sys, json, subprocess, urllib.parse
 
 if "SPARK_HOME" in os.environ:
     del os.environ["SPARK_HOME"]
