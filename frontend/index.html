@@ -590,12 +590,17 @@
                         </div>
                                                 <div v-show="adminSubTab==='training'" style="padding-top:20px;">
                             <h3 style="margin:0 0 20px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">模型训练</h3>
-                    <span style="color:#8892b0;margin-right:8px;">训练模式:</span>
+                <div style="margin-bottom:18px;display:flex;align-items:center;flex-wrap:wrap;gap:10px;">
+                    <span style="color:#8892b0;margin-right:6px;">训练模式:</span>
                     <el-radio-group v-model="trainingMode" size="small">
                         <el-radio-button label="local">本地</el-radio-button>
                         <el-radio-button label="cluster">集群</el-radio-button>
                     </el-radio-group>
-                    <span style="color:#64ffda;font-size:12px;margin-left:10px;">
+                    <span style='color:#ff9f43;font-size:12px;' v-if="trainingMode==='cluster'">需先启动集群</span>
+                    <span style='color:#8892b0;font-size:12px;' v-else>默认，无需集群</span>
+                    <a href="http://localhost:9090" target="_blank" style="color:#64ffda;font-size:12px;margin-left:8px;text-decoration:underline;">集群管理</a>
+                    <el-button size='mini' style='margin-left:8px;' @click="window.open('http://localhost:9090'); alert('确认 3 个 Workers 均为 ALIVE 状态后再开始训练')">查看集群</el-button>
+                </div>
                             <div style="max-width:600px;">
                                 <div style="margin-bottom:20px;">
                                     <label style="color:#8892b0;font-size:14px;display:block;margin-bottom:8px;">训练数据集</label>
