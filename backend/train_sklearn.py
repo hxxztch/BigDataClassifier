@@ -95,6 +95,7 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
             GBTClassifier as SparkGBT,
             NaiveBayes as SparkNB,
         )
+        from xgboost.spark import SparkXGBClassifier
         from pyspark.ml import Pipeline as MLlibPipeline
         from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 
@@ -114,6 +115,16 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
             ),
             "naive_bayes": SparkNB(
                 featuresCol="features", labelCol="label",
+            ),
+            "xgboost": SparkXGBClassifier(
+                features_col="features",
+                label_col="label",
+                num_workers=2,
+                n_estimators=100,
+                max_depth=6,
+                learning_rate=0.1,
+                missing=0.0,
+                verbosity=0,
             ),
         }
 
