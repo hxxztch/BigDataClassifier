@@ -1,6 +1,6 @@
-import json, os
+﻿import json, os
 from datetime import datetime
-from pyspark.sql.functions import col, count, when, isnan, isnull, lit, min as min_, max as max_, mean, std as std_
+from pyspark.sql.functions import col, count, when, isnan, isnull, lit, min as min_, max as max_, mean, stddev as std_
 from .config import MODELS_DIR, DATASET_META, SCENE_REQUIRED_COLS
 from .logger import get_logger
 logger = get_logger(__name__)
@@ -48,7 +48,7 @@ def compare_with_schema(df, scene_type):
                 sc = yaml.safe_load(f) or {}
             required = (sc.get('scenes', {}).get(scene_type, {}) or {}).get('required_cols', [])
     if not required:
-        # No required_cols defined — at minimum check the target column exists
+        # No required_cols defined 鈥?at minimum check the target column exists
         target_col = ""
         import yaml, os
         sy = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scenes.yaml')
@@ -60,7 +60,7 @@ def compare_with_schema(df, scene_type):
             return {"match": False, "required_cols": 0, "actual_cols": len(df.columns),
                     "missing_cols": [target_col], "extra_cols": [], "missing_count": 1, "extra_count": 0,
                     "message": "Target column not found: %s" % target_col}
-        return {"match": True, "message": "通过 (仅校验目标列，未定义必含列)"}
+        return {"match": True, "message": "閫氳繃 (浠呮牎楠岀洰鏍囧垪锛屾湭瀹氫箟蹇呭惈鍒?"}
     actual_cols = set(df.columns)
     required_set = set(required)
     missing = required_set - actual_cols
