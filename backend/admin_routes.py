@@ -49,6 +49,9 @@ def _train_subprocess(scene_id, csv_path, mode="local"):
     train_worker = os.path.join(_BACKEND_DIR, "train_worker.py")
     if os.path.exists(train_worker):
         env = os.environ.copy()
+        # Clear Py4J gateway from parent Flask process to avoid port conflict
+        for _k in ["PY4J_GATEWAY_PORT", "PY4J_GATEWAY_SECRET", "PYSPARK_GATEWAY_PORT", "PYSPARK_GATEWAY_SECRET"]:
+            env.pop(_k, None)
         env["MKL_NUM_THREADS"] = "1"
         env["OMP_NUM_THREADS"] = "1"
         env["OPENBLAS_NUM_THREADS"] = "1"

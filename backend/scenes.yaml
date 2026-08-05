@@ -36,7 +36,6 @@ scenes:
       0: Retain
       1: Churn
     required_cols:
-    - Churn
     - Tenure
     - PreferredLoginDevice
     - CityTier
