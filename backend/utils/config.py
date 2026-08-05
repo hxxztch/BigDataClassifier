@@ -1,4 +1,10 @@
-﻿
+﻿# Use standalone Spark PySpark 3.3.0 (matches cluster Master version)
+import sys
+_STANDALONE = r"E:\bigdata\spark-3.3.0-bin-hadoop3"
+if _STANDALONE + "\\\python" not in sys.path:
+    sys.path.insert(0, _STANDALONE + "\\\python")
+
+
 # ── Force JDK 17 for Spark (must be set before any pyspark import) ──
 import os as _os_java
 _os_java.environ.setdefault("JAVA_HOME", r"C:\Program Files\Java\jdk-17.0.20")
