@@ -595,7 +595,7 @@
                         <el-radio-button label="local">本地</el-radio-button>
                         <el-radio-button label="cluster">集群</el-radio-button>
                     </el-radio-group>
-                    <span style='color:#ff9f43;font-size:12px;' v-if="trainingMode==='cluster'">需先启动集群</span>
+                    <span style='color:#ff9f43;font-size:12px;' v-if="trainingMode==='cluster'">实验性，可能不可用</span>
                     <span style='color:#8892b0;font-size:12px;' v-else>默认，无需集群</span>
                     <a href="http://localhost:9090" target="_blank"
                        style="color:#64ffda;font-size:12px;margin-left:8px;text-decoration:underline;">集群管理</a>
