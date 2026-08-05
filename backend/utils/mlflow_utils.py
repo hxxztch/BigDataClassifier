@@ -40,7 +40,7 @@ def list_runs():
                 for mf in glob.glob(os.path.join(metrics_dir, "*")):
                     with open(mf) as m:
                         val = m.read().strip().split()
-                        metrics[os.path.basename(mf)] = float(val[0]) if val else 0
+                        metrics[os.path.basename(mf)] = float(val[1]) if len(val) > 1 else (float(val[0]) if val else 0)
             tags = {}
             tags_dir = os.path.join(run_dir, "tags")
             if os.path.isdir(tags_dir):
