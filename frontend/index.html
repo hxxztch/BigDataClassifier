@@ -1159,11 +1159,11 @@ methods: {
                         this.uploadFile = e.target.files[0];
                         this.uploadFileName = this.uploadFile ? this.uploadFile.name : "";
                     },
-fetchMlflowRuns() {
-                        axios.get("/api/mlflow/runs").then(res => {
-                            this.mlflowRuns = res.data || [];
-                            this.showMlflowDialog = true;
-                        });
+                    fetchMlflowRuns() {
+                    axios.get("/api/mlflow/runs").then(res => {
+                    this.mlflowRuns = res.data || [];
+                    this.showMlflowDialog = true;
+                    });
                     },
                                         startTraining() {
                         if (!this.uploadFile) { this.$message.warning("请选择训练数据集"); return; }
