@@ -536,6 +536,7 @@
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                                 <h3 style="margin:0;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">场景管理</h3>
                 <div style="margin-bottom:15px;display:flex;align-items:center;">
+                        {{ trainingMode === 'cluster' ? '（需先启动集群）' : '（默认，无需集群）' }}
                     </span>
                 </div>
                             <div style="margin-bottom:16px;padding:10px 14px;background:rgba(100,255,218,0.05);border-radius:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -582,45 +583,19 @@
                                 <el-table-column label="操作" width="150" fixed="right">
                                     <template slot-scope="scope">
                                         <el-button type="text" size="small" icon="el-icon-edit" @click="openEditScene(scope.row)" style="color:#64ffda;">修改</el-button>
-                                        <el-button type="text" size="small" icon="el-icon-delete" @click="deleteScene(scope.row.id)" style="color:#ff6b6b;">删除</el-button>
-                                        <el-button type="text" size="small" onclick="window.open('/api/mlflow/runs', '_blank')" style="color:#64ffda;">MLflow</el-button>
+                                        <el-button type="text" size="small" icon="el-icon-delete" @click="deleteScene(scope.row.id)" style="color:#ff6b6b;">删除</el-button> <el-button type="text" size="small" onclick="window.open('/api/mlflow/runs','_blank')" style="color:#64ffda;">MLflow</el-button>
                                     </template>
                                 </el-table-column>
                             </el-table>
                         </div>
-                                            <el-dialog title="MLflow" :visible.sync="showMlflowDialog" width="85%">
-                                                <el-table :data="mlflowRuns" stripe size="small" empty-text="暂无记录">
-                                                    <el-table-column prop="name" label="名称" width="280"></el-table-column>
-                                                    <el-table-column label="算法" width="120">
-                                                        <template slot-scope="s">{{ s.row.tags.algorithm || "-" }}</template>
-                                                    </el-table-column>
-                                                    <el-table-column label="后端" width="110">
-                                                        <template slot-scope="s">{{ s.row.tags.backend || "-" }}</template>
-                                                    </el-table-column>
-                                                    <el-table-column label="F1" width="80">
-                                                        <template slot-scope="s">{{ s.row.metrics.f1 ? (s.row.metrics.f1 * 100).toFixed(2) + "%" : "-" }}</template>
-                                                    </el-table-column>
-                                                    <el-table-column label="Acc" width="80">
-                                                        <template slot-scope="s">{{ s.row.metrics.accuracy ? (s.row.metrics.accuracy * 100).toFixed(2) + "%" : "-" }}</template>
-                                                    </el-table-column>
-                                                    <el-table-column prop="start_time" label="时间" width="160"></el-table-column>
-                                                </el-table>
-                                            </el-dialog>
                                                 <div v-show="adminSubTab==='training'" style="padding-top:20px;">
                             <h3 style="margin:0 0 20px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">模型训练</h3>
-                <div style="margin-bottom:18px;display:flex;align-items:center;flex-wrap:wrap;gap:10px;">
-                    <span style="color:#8892b0;margin-right:6px;">训练模式:</span>
+                    <span style="color:#8892b0;margin-right:8px;">训练模式:</span>
                     <el-radio-group v-model="trainingMode" size="small">
                         <el-radio-button label="local">本地</el-radio-button>
                         <el-radio-button label="cluster">集群</el-radio-button>
                     </el-radio-group>
-                    <span style='color:#ff9f43;font-size:12px;' v-if="trainingMode==='cluster'">实验性，可能不可用</span>
-                    <span style='color:#8892b0;font-size:12px;' v-else>默认，无需集群</span>
-                    <a href="http://localhost:9090" target="_blank"
-                       style="color:#64ffda;font-size:12px;margin-left:8px;text-decoration:underline;">集群管理</a>
-                    <a href="http://localhost:5001" target="_blank" style="color:#64ffda;font-size:12px;margin-left:8px;text-decoration:underline;">MLflow实验追踪</a>
-                    <span style="color:#8892b0;font-size:12px;margin-left:10px;">| 运行 cluster/start-cluster.bat 启动集群</span>
-                </div>
+                    <span style="color:#64ffda;font-size:12px;margin-left:10px;">
                             <div style="max-width:600px;">
                                 <div style="margin-bottom:20px;">
                                     <label style="color:#8892b0;font-size:14px;display:block;margin-bottom:8px;">训练数据集</label>
@@ -796,8 +771,6 @@
                     showManual: false,
                     validationErrorDialog: { visible: false, message: '' },
                     showAddSceneDialog: false,
-                    showMlflowDialog: false,
-                    mlflowRuns: [],
                     trainingMode: "local",
                     addSceneStep: 1,
                     analyzeResult: null,
@@ -1159,12 +1132,6 @@ methods: {
                         this.uploadFile = e.target.files[0];
                         this.uploadFileName = this.uploadFile ? this.uploadFile.name : "";
                     },
-                    fetchMlflowRuns() {
-                        axios.get("/api/mlflow/runs").then(res => {
-                        this.mlflowRuns = res.data || [];
-                        this.showMlflowDialog = true;
-                        });
-                        },
                     startTraining() {
                         if (!this.uploadFile) { this.$message.warning("请选择训练数据集"); return; }
                         if (!this.trainingScene) { this.$message.warning("请选择场景"); return; }
@@ -1311,8 +1278,7 @@ methods: {
                         this.descDialogVisible = true;
                     },
                 },
-                            },
-        mounted() {
+                mounted() {
                     this.fetchHistory();
                     this.fetchAdminScenes();
             this.fetchCategories();
