@@ -43,8 +43,14 @@ def data_quality():
         cache_key = hashlib.md5((file_path + scene_type).encode()).hexdigest()
         cache_dir = os.path.join(PROJECT_ROOT, "data", "cache")
         os.makedirs(cache_dir, exist_ok=True)
-        cache_path = os.path.join(cache_dir, cache_key + ".parquet")
-        df.write.mode("overwrite").parquet(cache_path)
+        cache_path = os.path.join(cache_dir, cache_key)  # Delta table (dir)
+        from utils.delta_utils import DeltaManager
+        _dm = DeltaManager(classifier.spark)
+        _dm.write(df, cache_path, mode="overwrite")
+        # Log data version history for time travel
+        _history = _dm.history(cache_path, limit=3)
+        if _history:
+            logger.info(f"[Delta] Data cache: {cache_key} ({len(_history)} versions)")
         return jsonify({
             "schema_check": schema_check,
             "total_rows": dq_report["total_rows"],

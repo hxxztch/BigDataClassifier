@@ -174,6 +174,12 @@ def get_spark_builder(app_name="SparkPredictor", driver_memory="4g", executor_me
             .config("spark.executor.cores", "2") \
             .config("spark.dynamicAllocation.enabled", "false") \
             .config("spark.jars.packages", "ml.dmlc:xgboost4j-spark_2.12:2.1.4")
+    # ── Delta Lake (ACID transactions, time travel) ──
+    builder = builder \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+        .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0")
+
     # ── Adaptive Query Execution (Spark 3.x core feature) ──
     builder = builder \
         .config("spark.sql.adaptive.enabled", "true") \
