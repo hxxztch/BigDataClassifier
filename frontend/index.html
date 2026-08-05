@@ -532,7 +532,27 @@
                                 </div>
                             </el-dialog>
                         </div>
-                        <div v-show="adminSubTab==='scenes'">
+                        
+                <h3 style="margin:30px 0 15px;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">实验记录 (MLflow)</h3>
+                <el-button size="small" style="margin-bottom:10px;" @click="fetchMlflowRuns" icon="el-icon-refresh">刷新</el-button>
+                <el-table :data="mlflowRuns" stripe size="small" style="width:100%;">
+                    <el-table-column prop="name" label="实验名称" width="280"></el-table-column>
+                    <el-table-column label="算法" width="120">
+                        <template slot-scope="s">{{ s.row.tags.algorithm }}</template>
+                    </el-table-column>
+                    <el-table-column label="后端" width="120">
+                        <template slot-scope="s">{{ s.row.tags.backend }}</template>
+                    </el-table-column>
+                    <el-table-column label="F1" width="80">
+                        <template slot-scope="s">{{ (s.row.metrics.f1 * 100).toFixed(2) }}%</template>
+                    </el-table-column>
+                    <el-table-column label="Acc" width="80">
+                        <template slot-scope="s">{{ (s.row.metrics.accuracy * 100).toFixed(2) }}%</template>
+                    </el-table-column>
+                    <el-table-column prop="start_time" label="时间" width="160"></el-table-column>
+                </el-table>
+
+<div v-show="adminSubTab==='scenes'">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                                 <h3 style="margin:0;color:#e6f1ff;border-left:4px solid #64ffda;padding-left:10px;">场景管理</h3>
                 <div style="margin-bottom:15px;display:flex;align-items:center;">
@@ -778,6 +798,7 @@
                     validationErrorDialog: { visible: false, message: '' },
                     showAddSceneDialog: false,
                     trainingMode: "local",
+                    mlflowRuns: [],
                     addSceneStep: 1,
                     analyzeResult: null,
                     addSceneConfig: {},
@@ -1285,6 +1306,7 @@ methods: {
                     },
                 },
                 mounted() {
+                    this.fetchMlflowRuns();
                     this.fetchHistory();
                     this.fetchAdminScenes();
             this.fetchCategories();

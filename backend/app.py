@@ -182,6 +182,14 @@ def index():
     resp.headers["Expires"] = "0"
     return resp
 
+@app.route("/api/mlflow/runs", methods=["GET"])
+def mlflow_runs():
+    try:
+        from utils.mlflow_utils import list_runs
+        return jsonify(list_runs())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
