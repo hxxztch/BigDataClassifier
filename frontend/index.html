@@ -583,7 +583,7 @@
                                     <template slot-scope="scope">
                                         <el-button type="text" size="small" icon="el-icon-edit" @click="openEditScene(scope.row)" style="color:#64ffda;">修改</el-button>
                                         <el-button type="text" size="small" icon="el-icon-delete" @click="deleteScene(scope.row.id)" style="color:#ff6b6b;">删除</el-button>
-                                        <el-button type="text" size="small" @click="fetchMlflowRuns" style="color:#64ffda;">MLflow</el-button>
+                                        <el-button type="text" size="small" onclick="window.open('/api/mlflow/runs', '_blank')" style="color:#64ffda;">MLflow</el-button>
                                     </template>
                                 </el-table-column>
                             </el-table>
@@ -1160,12 +1160,12 @@ methods: {
                         this.uploadFileName = this.uploadFile ? this.uploadFile.name : "";
                     },
                     fetchMlflowRuns() {
-                    axios.get("/api/mlflow/runs").then(res => {
-                    this.mlflowRuns = res.data || [];
-                    this.showMlflowDialog = true;
-                    });
-                    },
-                                        startTraining() {
+                        axios.get("/api/mlflow/runs").then(res => {
+                        this.mlflowRuns = res.data || [];
+                        this.showMlflowDialog = true;
+                        });
+                        },
+                    startTraining() {
                         if (!this.uploadFile) { this.$message.warning("请选择训练数据集"); return; }
                         if (!this.trainingScene) { this.$message.warning("请选择场景"); return; }
                         this.trainingRunning = true;
@@ -1311,7 +1311,8 @@ methods: {
                         this.descDialogVisible = true;
                     },
                 },
-                mounted() {
+                            },
+        mounted() {
                     this.fetchHistory();
                     this.fetchAdminScenes();
             this.fetchCategories();
