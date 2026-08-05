@@ -29,6 +29,27 @@ def analyze_dataframe(df, scene_type):
             except Exception:
                 pass
         col_stats[c] = stats
+    
+    # ── Spark SQL path: log execution plan for Catalyst visibility ──
+    try:
+        from .spark_sql_utils import SparkSQLAnalyzer
+        _sqa = SparkSQLAnalyzer(df.sql_ctx.sparkSession)
+        _table = f"__dq_{scene_type}"
+        df.createOrReplaceTempView(_table)
+        _sql_report = _sqa.sql_column_stats(_table, columns)
+        logger.info("[SQL] Column stats computed via Spark SQL (CTE + CASE WHEN)")
+        # Detect data skew
+        _skew = _sqa.detect_skew(df)
+        if _skew.get("skewed"):
+            report["skew_warning"] = (
+                f"Data skew detected: max/avg partition ratio = {_skew['skew_ratio']}x. "
+                f"Max partition: {_skew['max_rows_per_partition']} rows. "
+                f"Consider salt-based repartition on skewed column."
+            )
+    except Exception as _se:
+        logger.warning(f"[SQL] analysis skipped: {_se}")
+
+
     report = {"total_rows": total, "total_columns": len(columns), "columns": col_stats, "missing_threshold": 50, "analysis_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     warnings = []
     for c, s in col_stats.items():

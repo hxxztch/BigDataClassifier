@@ -174,6 +174,14 @@ def get_spark_builder(app_name="SparkPredictor", driver_memory="4g", executor_me
             .config("spark.executor.cores", "2") \
             .config("spark.dynamicAllocation.enabled", "false") \
             .config("spark.jars.packages", "ml.dmlc:xgboost4j-spark_2.12:2.1.4")
+    # ── Adaptive Query Execution (Spark 3.x core feature) ──
+    builder = builder \
+        .config("spark.sql.adaptive.enabled", "true") \
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+        .config("spark.sql.adaptive.skewJoin.enabled", "true") \
+        .config("spark.sql.adaptive.skewJoin.skewedPartitionFactor", "5") \
+        .config("spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes", "256MB")
+
     if _HAS_RAPIDS and _GPU_ACCELERATION_ENABLED:
         builder = builder.config("spark.jars", _RAPIDS_JAR_URI)
     return builder
