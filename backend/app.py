@@ -71,6 +71,8 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10GB
 
 # Init
 init_db()
+from utils.mlflow_utils import init_mlflow
+init_mlflow(PROJECT_ROOT)
 classifier = SparkClassifier()
 set_shared_spark(classifier.spark)
 

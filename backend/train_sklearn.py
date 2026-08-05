@@ -21,6 +21,7 @@ from utils.config import get_spark_builder
 from utils.preprocessing import clean_column_names, custom_preprocessing, build_feature_preprocessing_stages
 from utils.logger import get_logger
 from utils.version_manager import next_version as _next_ver, register as _reg_ver
+from utils.mlflow_utils import log_mllib_model, log_sklearn_model
 
 logger = get_logger("spark_trainer")
 
@@ -184,6 +185,22 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
                 with open(os.path.join(mllib_save, "metadata.json"), "w") as mf:
                     json.dump(mllib_meta, mf, indent=2)
 
+                # ── MLflow tracking ──
+                try:
+                    log_mllib_model(
+                        algo_name, task_name,
+                        params={
+                            "train_size": total_rows,
+                            "num_classes": mllib_meta["num_classes"],
+                        },
+                        metrics={
+                            "f1": mllib_meta["f1_score"],
+                            "accuracy": mllib_meta["accuracy"],
+                        },
+                    )
+                except Exception as _mle:
+                    logger.warning(f"    [MLflow] log failed: {_mle}")
+
             except Exception as ml_err:
                 logger.error(f"    [MLlib] {algo_name} FAILED: {ml_err}")
                 mllib_results[algo_name] = {"accuracy": 0.0, "f1_score": 0.0}
@@ -324,6 +341,16 @@ def train_sklearn(file_path, scene_id=None, spark=None, progress_callback=None):
                 json.dump(meta, f, indent=2)
 
             results[algo_name] = {"accuracy": round(float(acc), 4), "f1_score": round(float(f1), 4), "train_size": row_count}
+
+            # ── MLflow tracking (sklearn) ──
+            try:
+                log_sklearn_model(
+                    algo_name, task_name,
+                    params={"train_size": row_count, "threshold": best_threshold},
+                    metrics={"f1": round(float(f1), 4), "accuracy": round(float(acc), 4)},
+                )
+            except Exception as _mle:
+                logger.warning(f"    [MLflow] log failed: {_mle}")
             elapsed = time.time() - start
             logger.info(f"    {algo_name} F1: {f1*100:.2f}% (Acc: {acc*100:.2f}%) - {elapsed:.1f}s")
 
