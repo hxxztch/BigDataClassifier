@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 MLflow experiment tracking: replace version_registry.json with proper ML tracking.
 """
@@ -15,7 +15,7 @@ def init_mlflow(project_root: str):
     """Initialize MLflow tracking. Called once at app startup."""
     global _TRACKING_DIR
     _TRACKING_DIR = os.path.join(project_root, "mlruns")
-    mlflow.set_tracking_uri(f"file:///{_TRACKING_DIR.replace(chr(92), '/')}")
+    mlflow.set_tracking_uri(f"sqlite:///{_TRACKING_DIR}/mlflow.db")
     mlflow.set_experiment("BigDataClassifier")
     logger.info(f"MLflow initialized: {_TRACKING_DIR}")
 
