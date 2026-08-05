@@ -8,14 +8,14 @@ from .logger import get_logger
 
 logger = get_logger("mlflow")
 
-_TRACKING_DIR = None
+_TRACKING_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "mlruns")
 
 
-def init_mlflow(project_root: str):
+def init_mlflow():
     """Initialize MLflow tracking. Called once at app startup."""
     global _TRACKING_DIR
-    _TRACKING_DIR = os.path.join(project_root, "mlruns")
-    mlflow.set_tracking_uri(f"sqlite:///{_TRACKING_DIR}/mlflow.db")
+    global _TRACKING_DIR
+    # Use default file-based tracking (works with MLflow 3.x)
     mlflow.set_experiment("BigDataClassifier")
     logger.info(f"MLflow initialized: {_TRACKING_DIR}")
 

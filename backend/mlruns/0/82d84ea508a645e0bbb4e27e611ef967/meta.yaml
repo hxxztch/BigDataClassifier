@@ -1,0 +1,15 @@
+artifact_uri: file:///E:/Study/Spark%E5%A4%A7%E6%95%B0%E6%8D%AE%E5%BF%AB%E9%80%9F%E5%88%86%E7%B1%BB/BigDataClassifier/backend/mlruns/0/82d84ea508a645e0bbb4e27e611ef967/artifacts
+end_time: 1785955389952
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 82d84ea508a645e0bbb4e27e611ef967
+run_name: trans_delay_gbdt_MLlib
+run_uuid: 82d84ea508a645e0bbb4e27e611ef967
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1785955389907
+status: 3
+tags: []
+user_id: Administrator
