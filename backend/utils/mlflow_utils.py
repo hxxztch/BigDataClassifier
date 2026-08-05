@@ -8,7 +8,7 @@ from .logger import get_logger
 
 logger = get_logger("mlflow")
 
-_TRACKING_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "mlruns")
+_TRACKING_DIR = os.path.join(os.path.dirname(__file__), "..", "mlruns")
 
 
 def init_mlflow():
@@ -23,7 +23,7 @@ def init_mlflow():
 def list_runs():
     import yaml
     global _TRACKING_DIR
-    _dir = _TRACKING_DIR or os.path.join(os.path.dirname(__file__), "..", "..", "mlruns")
+    _dir = _TRACKING_DIR or os.path.join(os.path.dirname(__file__), "..", "mlruns")
     runs = []
     for exp_dir in glob.glob(os.path.join(_dir, "*")):
         if not os.path.isdir(exp_dir) or os.path.basename(exp_dir).startswith("."):
