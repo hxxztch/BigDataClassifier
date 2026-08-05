@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Spark SQL utilities: SQL-based data quality, skew detection, salt repartition.
 Demonstrates Catalyst optimizer awareness via EXPLAIN output.
@@ -18,13 +18,13 @@ class SparkSQLAnalyzer:
     def __init__(self, spark: SparkSession):
         self.spark = spark
 
-    # ── Plan visibility ──────────────────────────────────
+    # 鈹€鈹€ Plan visibility 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     def _explain_and_log(self, df: DataFrame, label: str):
         """Output physical plan to log for Catalyst awareness."""
         plan = df._jdf.queryExecution().executedPlan().toString()
         logger.info(f"[PLAN] {label}:\n{plan[:2000]}")
 
-    # ── SQL-based column statistics ──────────────────────
+    # 鈹€鈹€ SQL-based column statistics 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     def sql_column_stats(self, table_name: str, columns: list) -> dict:
         """
         Compute per-column statistics using Spark SQL (not DataFrame API).
@@ -40,9 +40,9 @@ class SparkSQLAnalyzer:
         for c in columns:
             dtype = self.spark.sql(
                 f"DESCRIBE {table_name} {c}"
-            ).collect()[0]["data_type"]
+            ).collect()[0][1]
 
-            # ── SQL-based statistics (single pass with CTE) ──
+            # 鈹€鈹€ SQL-based statistics (single pass with CTE) 鈹€鈹€
             sql = textwrap.dedent(f"""
                 WITH stats AS (
                     SELECT
@@ -84,7 +84,7 @@ class SparkSQLAnalyzer:
 
         return result
 
-    # ── Data skew detection ──────────────────────────────
+    # 鈹€鈹€ Data skew detection 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     def detect_skew(self, df: DataFrame, partition_col: str = None) -> dict:
         """
         Analyze partition distribution to detect data skew.
@@ -126,7 +126,7 @@ class SparkSQLAnalyzer:
 
         return result
 
-    # ── Salt-based repartition ───────────────────────────
+    # 鈹€鈹€ Salt-based repartition 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     def salt_repartition(self, df: DataFrame, skew_col: str, num_salts: int = 10) -> DataFrame:
         """
         Salt-based repartition for skewed data.
@@ -142,11 +142,11 @@ class SparkSQLAnalyzer:
         result = salted.repartition(num_salts, salt_col_name, skew_col)
         logger.info(
             f"[SALT] Repartitioned on ({salt_col_name}, {skew_col}) "
-            f"with {num_salts} salts → {result.rdd.getNumPartitions()} partitions"
+            f"with {num_salts} salts 鈫?{result.rdd.getNumPartitions()} partitions"
         )
         return result
 
-    # ── SQL-based feature engineering ────────────────────
+    # 鈹€鈹€ SQL-based feature engineering 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     def sql_feature_engineering(self, table_name: str, scene_type: str) -> DataFrame:
         """
         Generate features using Spark SQL CASE WHEN instead of DataFrame withColumn.
